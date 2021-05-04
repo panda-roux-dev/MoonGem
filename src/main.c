@@ -1,4 +1,6 @@
+#include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "log.h"
@@ -9,6 +11,15 @@
 
 #define PORT 1965
 #define DEFAULT_DOCUMENT "/index.gmi"
+#define EXT_GMI ".gmi"
+
+static bool path_is_gmi(const char* path) {
+  if (path == NULL) {
+    return false;
+  }
+
+  return strcmp(strrchr(path, '.'), EXT_GMI) == 0;
+}
 
 static callback_result_t handle_request(const request_t* request,
                                         response_t* response) {
@@ -21,7 +32,40 @@ static callback_result_t handle_request(const request_t* request,
     return ERROR;
   }
 
-  callback_result_t result = parse_response_from_file(file, request, response);
+  callback_result_t result;
+
+  if (path_is_gmi(path)) {
+    // parse .gmi files into gemtext
+
+    result = parse_response_from_file(file, request, response);
+  } else {
+    // serve any file that doesn't have a .gmi extension in a simple static
+    // operation
+    //
+    // not using default path and the path isn't .gmi; so we need to infer
+    // mimetype
+
+    LOG("path: %s", path);
+
+    response->mimetype = get_mimetype(path);
+    response->status = STATUS_SUCCESS;
+
+    fseek(file, 0, SEEK_END);
+    response->body_length = ftell(file);
+    response->body = malloc(response->body_length * sizeof(char));
+    if (response->body == NULL) {
+      LOG_ERROR("Failed to allocate %zu bytes of memory for %s",
+                response->body_length, path);
+      response->status = STATUS_PERMANENT_FAILURE;
+      response->meta = strdup("File is too large for the server to handle");
+      result = ERROR;
+    } else {
+      fseek(file, 0, SEEK_SET);
+      fread(response->body, sizeof(char), response->body_length, file);
+      result = OK;
+    }
+  }
+
   fclose(file);
 
   return result;

@@ -33,4 +33,10 @@ void serve_static(char* path, char** buffer, size_t* length);
 
 size_t read_file(const char* path, char** contents);
 
+/*
+ * Returns a string representation of the MIME type of the file at the provided
+ * path
+ */
+char* get_mimetype(const char* path);
+
 #endif

@@ -1,5 +1,6 @@
 #include "util.h"
 
+#include <magic.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -124,4 +125,12 @@ size_t read_file(const char* path, char** contents) {
 
   *contents = output;
   return bytes_read;
+}
+
+char* get_mimetype(const char* path) {
+  struct magic_set* magic = magic_open(MAGIC_MIME | MAGIC_CHECK);
+  magic_load(magic, NULL);
+  char* result = strdup(magic_file(magic, path));
+  magic_close(magic);
+  return result;
 }

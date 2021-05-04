@@ -43,7 +43,7 @@
 #define SPACE " "
 #define NEWLINE "\n"
 
-int api_head_set_lang(lua_State* L);
+int api_head_set_lang(lua_State* L) { return 0; }
 
 int api_body_include(lua_State* L) {
   ARG_COUNT(L, 1);

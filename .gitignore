@@ -4,3 +4,4 @@ compile_commands.json
 *.cert
 *.key
 *.pem
+.cache/
