@@ -8,10 +8,12 @@
 #include "util.h"
 
 #define PORT 1965
+#define DEFAULT_DOCUMENT "/index.gmi"
 
 static callback_result_t handle_request(const request_t* request,
                                         response_t* response) {
-  FILE* file = fopen(request->path + 1, "rb");
+  const char* path = request->path != NULL ? request->path : DEFAULT_DOCUMENT;
+  FILE* file = fopen(path + 1, "rb");
   if (file == NULL) {
     response->status = STATUS_NOT_FOUND;
     response->meta = strdup("File does not exist");
