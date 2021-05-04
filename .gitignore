@@ -1,0 +1,6 @@
+build/
+.clang-tidy
+compile_commands.json
+*.cert
+*.key
+*.pem
