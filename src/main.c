@@ -12,7 +12,8 @@
 
 static callback_result_t handle_request(const request_t* request,
                                         response_t* response) {
-  const char* path = request->path != NULL ? request->path : DEFAULT_DOCUMENT;
+  const char* path =
+      request->path_length > 1 ? request->path : DEFAULT_DOCUMENT;
   FILE* file = fopen(path + 1, "rb");
   if (file == NULL) {
     response->status = STATUS_NOT_FOUND;
