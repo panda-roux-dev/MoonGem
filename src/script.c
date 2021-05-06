@@ -121,7 +121,7 @@ static void init_response_buffer(lua_State* L) {
   lua_pop(L, 1);
 }
 
-script_ctx_t* init_script() {
+script_ctx_t* init_script(const char* path) {
   script_ctx_t* ctx = malloc(sizeof(script_ctx_t));
   if (ctx == NULL) {
     LOG_ERROR("Failed to allocate space for the script context");
@@ -131,6 +131,11 @@ script_ctx_t* init_script() {
   ctx->result = NULL;
   ctx->result_len = 0;
   ctx->language = NULL;
+  ctx->path = NULL;
+
+  if (path != NULL) {
+    ctx->path = strdup(path);
+  }
 
   ctx->L = luaL_newstate();
   init_scripting_api(ctx->L);
@@ -152,6 +157,10 @@ void destroy_script(script_ctx_t* ctx) {
       free(ctx->result);
     }
 
+    if (ctx->path != NULL) {
+      free(ctx->path);
+    }
+
     free(ctx);
   }
 }
@@ -165,6 +174,12 @@ int run_script(script_ctx_t* ctx, char* contents) {
   if (ctx->result != NULL) {
     free(ctx->result);
     ctx->result = NULL;
+  }
+
+  // set the PATH global variable
+  if (ctx->path != NULL) {
+    lua_pushstring(L, ctx->path);
+    lua_setglobal(L, FLD_PATH);
   }
 
   if (luaL_dostring(L, contents) != LUA_OK) {

@@ -24,8 +24,9 @@ typedef struct {
   bool script_mode;
 } doc_state_t;
 
-static doc_state_t create_doc_state() {
-  doc_state_t state = {create_buffer(), create_buffer(), init_script(), false};
+static doc_state_t create_doc_state(const char* path) {
+  doc_state_t state = {create_buffer(), create_buffer(), init_script(path),
+                       false};
   return state;
 }
 
@@ -101,7 +102,7 @@ static bool parse_line(char* line, doc_state_t* state) {
 int parse_response_from_file(FILE* file, const request_t* request,
                              response_t* response) {
   bool line_error = false;
-  doc_state_t state = create_doc_state();
+  doc_state_t state = create_doc_state(request->path);
   char buffer[LINE_BUFFER_SIZE];
   while (fgets(&buffer[0], sizeof(buffer) / sizeof(char), file)) {
     if (!parse_line(&buffer[0], &state)) {

@@ -19,9 +19,10 @@ typedef struct {
   lua_State* L;
   char* language;
   char* result;
+  char* path;
 } script_ctx_t;
 
-script_ctx_t* init_script();
+script_ctx_t* init_script(const char* path);
 
 void destroy_script(script_ctx_t* ctx);
 
