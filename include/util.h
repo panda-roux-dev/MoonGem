@@ -2,7 +2,9 @@
 #define UTIL_H
 
 #include <limits.h>
+#include <net.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #define BUFFER_APPEND_FAILURE INT_MIN
 
@@ -29,7 +31,8 @@ int check_privileges(void);
  * Creates a new buffer at `*buffer` and copies the contents of a static file at
  * `path` into it.  The size of the file (in bytes) is stored in `*length`.
  */
-void serve_static(char* path, char** buffer, size_t* length);
+callback_result_t serve_static(const char* path, FILE* file,
+                               response_t* response);
 
 size_t read_file(const char* path, char** contents);
 

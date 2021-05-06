@@ -14,6 +14,8 @@
 #define DEFAULT_DOCUMENT "index.gmi"
 #define EXT_GMI ".gmi"
 
+#define INVALID_URL_PATTERNS "/..", "/.", "/../", "/./", "~/", "$"
+
 static bool path_is_gmi(const char* path) {
   if (path == NULL) {
     return false;
@@ -48,6 +50,17 @@ static char* append_default_doc(const request_t* request) {
   return path;
 }
 
+static bool path_is_illegal(const char* path) {
+  const char* bad_strings[] = {INVALID_URL_PATTERNS};
+  for (int i = 0; i < sizeof(bad_strings) / sizeof(char*); ++i) {
+    if (strstr(path, bad_strings[i]) != NULL) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static callback_result_t handle_request(const request_t* request,
                                         response_t* response) {
   char* path;
@@ -57,7 +70,13 @@ static callback_result_t handle_request(const request_t* request,
     path = strndup(request->path, request->path_length);
   }
 
-  LOG("Path: %s", path);
+  if (path_is_illegal(path)) {
+    // don't permit directory browsing
+    response->status = STATUS_BAD_REQUEST;
+    response->meta = strdup("Invalid URL");
+    free(path);
+    return ERROR;
+  }
 
   FILE* file = fopen(path + 1, "rb");
   if (file == NULL) {
@@ -76,27 +95,8 @@ static callback_result_t handle_request(const request_t* request,
   } else {
     // serve any file that doesn't have a .gmi extension in a simple static
     // operation
-    //
-    // not using default path and the path isn't .gmi; so we need to infer
-    // mimetype
 
-    response->mimetype = get_mimetype(path);
-    response->status = STATUS_SUCCESS;
-
-    fseek(file, 0, SEEK_END);
-    response->body_length = ftell(file);
-    response->body = malloc(response->body_length * sizeof(char));
-    if (response->body == NULL) {
-      LOG_ERROR("Failed to allocate %zu bytes of memory for %s",
-                response->body_length, path);
-      response->status = STATUS_PERMANENT_FAILURE;
-      response->meta = strdup("File is too large for the server to handle");
-      result = ERROR;
-    } else {
-      fseek(file, 0, SEEK_SET);
-      fread(response->body, sizeof(char), response->body_length, file);
-      result = OK;
-    }
+    result = serve_static(path, file, response);
   }
 
   free(path);

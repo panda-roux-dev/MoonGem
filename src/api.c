@@ -34,7 +34,7 @@
     lua_error(L);                           \
   }
 
-#define ARG(n) (n + 1)
+#define ARG(n) ((n) + 1)
 #define SELF 1
 #define LINK_TOKEN "=>"
 #define HEADER_TOKEN "#"

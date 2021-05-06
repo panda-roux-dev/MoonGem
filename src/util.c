@@ -1,6 +1,7 @@
 #include "util.h"
 
 #include <magic.h>
+#include <status.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -134,4 +135,24 @@ char* get_mimetype(const char* path) {
   char* result = strdup(magic_file(magic, path));
   magic_close(magic);
   return result;
+}
+
+callback_result_t serve_static(const char* path, FILE* file,
+                               response_t* response) {
+  response->mimetype = get_mimetype(path);
+  response->status = STATUS_SUCCESS;
+
+  fseek(file, 0, SEEK_END);
+  response->body_length = ftell(file);
+  response->body = malloc(response->body_length * sizeof(char));
+  if (response->body == NULL) {
+    LOG_ERROR("Failed to allocate %zu bytes of memory for %s",
+              response->body_length, path);
+    response->status = STATUS_PERMANENT_FAILURE;
+    response->meta = strdup("File is too large for the server to handle");
+    return ERROR;
+  }     fseek(file, 0, SEEK_SET);
+    fread(response->body, sizeof(char), response->body_length, file);
+    return OK;
+ 
 }
