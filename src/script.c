@@ -170,7 +170,6 @@ int run_script(script_ctx_t* ctx, char* contents) {
 
   // set the PATH global variable
   if (ctx->path != NULL) {
-    LOG("Path: %s", ctx->path);
     lua_pushstring(L, ctx->path);
     lua_setglobal(L, FLD_PATH);
   }
