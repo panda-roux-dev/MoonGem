@@ -35,4 +35,6 @@ target_include_directories(${MOONGEM_EXE} PRIVATE
   ${LUA_INCLUDE_DIR}
   ${OPENSSL_INCLUDE_DIR})
 
-
+if(DISABLE_LOGGING)
+  target_compile_definitions(${MOONGEM_EXE} PRIVATE MOONGEM_DISABLE_LOGGING)
+endif()
