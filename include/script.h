@@ -3,8 +3,7 @@
 
 #include "net.h"
 
-#define TBL_REQUEST "_REQUEST"
-#define FLD_PATH "path"
+#define FLD_PATH "PATH"
 
 #define TBL_RESPONSE "_RESPONSE"
 #define FLD_BUFFER "buffer"

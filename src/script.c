@@ -99,14 +99,6 @@ static void add_header_api_methods(lua_State* L) {
 static void init_scripting_api(lua_State* L) {
   luaL_openlibs(L);
 
-  // add global request table
-  lua_newtable(L);
-
-  lua_pushstring(L, "\0");
-  lua_setfield(L, 1, FLD_PATH);
-
-  lua_setglobal(L, TBL_REQUEST);
-
   // add global response table
   lua_newtable(L);
   lua_setglobal(L, TBL_RESPONSE);
@@ -178,6 +170,7 @@ int run_script(script_ctx_t* ctx, char* contents) {
 
   // set the PATH global variable
   if (ctx->path != NULL) {
+    LOG("Path: %s", ctx->path);
     lua_pushstring(L, ctx->path);
     lua_setglobal(L, FLD_PATH);
   }
