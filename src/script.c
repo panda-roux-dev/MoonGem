@@ -4,6 +4,7 @@
 #include <lua.h>
 #include <lualib.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "log.h"
 #include "status.h"
