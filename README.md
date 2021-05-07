@@ -37,8 +37,8 @@ write_fibonacci(20)
 ## API
 
 The start and end of script sections are indicated with a special sequence of characters, which must appear on their own lines, without any prefix:
-* Start: -<<
-* End: >>-
+* Start: `-<<`
+* End: `>>-`
 
 I chose these tokens because in my opinion they're visually distinctive and unlikely to be included in any typical content.
 
@@ -46,44 +46,44 @@ A single global variable PATH contains the path of the requested page (i.e. /my/
 
 MoonGem exposes the following Lua functions for generating content:
 
-### BODY:include(<path>)
-* Inserts the contents of the file at <path>. Note that this DOES NOT run embedded scripts in the source document if a Gemtext file is specified. This is an intentional choice for the sake of simplicity.
+`BODY:include(<path>)`
+Inserts the contents of the file at <path>. Note that this DOES NOT run embedded scripts in the source document if a Gemtext file is specified. This is an intentional choice for the sake of simplicity.
 
 ---
 
-### BODY:write(<text>)
-* Writes <text> to the body of the document. No new-line character is appended.
+`BODY:write(<text>)`
+Writes <text> to the body of the document. No new-line character is appended.
 
 ---
 
-### BODY:line(<text>)
-* Writes <text> to the body of the document, followed by a new-line character.
+`BODY:line(<text>)`
+Writes <text> to the body of the document, followed by a new-line character.
 
 ---
 
-### BODY:link(<url>, [text])
-* Writes a link pointing to <url> to the body of the document. Optionally, [text] can be specified in order to append link alt-text.
+`BODY:link(<url>, [text])`
+Writes a link pointing to <url> to the body of the document. Optionally, [text] can be specified in order to append link alt-text.
 
 ---
 
-### BODY:heading(<text>, <level>)
-* Writes <text> as a heading line to the body of the document. The value of <level> indicates the heading level (in other words, <level> == number of #'s).
+`BODY:heading(<text>, <level>)`
+Writes <text> as a heading line to the body of the document. The value of <level> indicates the heading level (in other words, <level> == number of #'s).
 
 ---
 
-### BODY:block(<text>)
-* Writes <text> in a preformatted block.
+`BODY:block(<text>)`
+Writes <text> in a preformatted block.
 
 ---
 
-### BODY:begin_block([alt-text])
-* Writes the beginning of a preformatted block with optional [alt-text].
+`BODY:begin_block([alt-text])`
+Writes the beginning of a preformatted block with optional [alt-text].
 
 ---
 
-### BODY:end_block()
-* Writes the end of a preformatted block.
+`BODY:end_block()`
+Writes the end of a preformatted block.
 
 ## Source
 
-=> https://git.sr.ht/~panda-roux/MoonGem/ The source code can be found here
+[The source code can be found here](https://git.sr.ht/~panda-roux/MoonGem/)
