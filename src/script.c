@@ -1,6 +1,7 @@
 #include "script.h"
 
 #include <lauxlib.h>
+#include <libgen.h>
 #include <lua.h>
 #include <lualib.h>
 #include <stdlib.h>
@@ -169,10 +170,24 @@ int run_script(script_ctx_t* ctx, char* contents) {
     ctx->result = NULL;
   }
 
-  // set the PATH global variable
   if (ctx->path != NULL) {
+    // set the PATH global variable
     lua_pushstring(L, ctx->path);
     lua_setglobal(L, FLD_PATH);
+
+    // add the request path to package.path
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "path");
+    if (strrchr(ctx->path, '.') != NULL) {
+      char* dir = dirname(ctx->path);
+      lua_pushfstring(L, ";./%s/?.lua", dir);
+      lua_pushfstring(L, ";./%s/?", dir);
+    } else {
+      lua_pushfstring(L, ";./%s/?.lua", ctx->path);
+      lua_pushfstring(L, ";./%s/?", ctx->path);
+    }
+    lua_concat(L, 3);
+    lua_setfield(L, -2, "path");
   }
 
   if (luaL_dostring(L, contents) != LUA_OK) {
