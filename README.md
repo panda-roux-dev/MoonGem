@@ -34,6 +34,8 @@ write_fibonacci(20)
 ./moongem <path-to-certificate.pem> <path-to-key.pem> <root-content-dir>
 ```
 
+Optionally, set the MOONGEM_PORT environment variable to listen on a non-default network port.
+
 ## API
 
 The start and end of script sections are indicated with a special sequence of characters, which must appear on their own lines, without any prefix:

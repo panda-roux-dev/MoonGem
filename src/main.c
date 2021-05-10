@@ -13,6 +13,7 @@
 #define PORT 1965
 #define DEFAULT_DOCUMENT "index.gmi"
 #define EXT_GMI ".gmi"
+#define VAR_MOONGEM_PORT "MOONGEM_PORT"
 
 #define INVALID_URL_PATTERNS "/..", "/.", "/../", "/./", "~/", "$"
 
@@ -118,9 +119,22 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
+  int port = PORT;
+
+  // check environment variable for user-specified network port
+  char* port_var = getenv(VAR_MOONGEM_PORT);
+  if (port_var != NULL) {
+    port = (int)atol(port_var);
+    if (port == 0) {
+      LOG_ERROR("Invalid value \"%s\" provided for %s.  Terminating...",
+                port_var, VAR_MOONGEM_PORT);
+      return EXIT_FAILURE;
+    }
+  }
+
   // set up socket + TLS
   net_t* sock;
-  if ((sock = init_socket(PORT, argv[1], argv[2])) == NULL) {
+  if ((sock = init_socket(port, argv[1], argv[2])) == NULL) {
     LOG_ERROR("Failed to intiialize network socket.  Terminating...");
     return EXIT_FAILURE;
   }
