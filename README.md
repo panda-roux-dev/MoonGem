@@ -2,7 +2,7 @@
 
 ## Introduction
 
-MoonGem is a Gemini protocol server written in C. It supports serving static files as well as Gemtext (.gmi) files with inline Lua scripting. This capsule you're reading is hosted in MoonGem.
+MoonGem is a Gemini protocol server written in C. It supports serving static files as well as Gemtext (.gmi) files with inline Lua scripting.
 
 Inline scripts are indicated by special begin/end line tokens. An example page might look like this:
 
