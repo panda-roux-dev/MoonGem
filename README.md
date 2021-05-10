@@ -1,3 +1,5 @@
+[![builds.sr.ht status](https://builds.sr.ht/~panda-roux/MoonGem.svg)](https://builds.sr.ht/~panda-roux/MoonGem?)
+
 # MoonGem
 
 ## Introduction
