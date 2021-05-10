@@ -19,7 +19,8 @@
   }
 
 #ifdef DEBUG
-#define LOG_DEBUG(fmt, ...) printf("DEBUG: " fmt "\n", ##__VA_ARGS__)
+#define LOG_DEBUG(fmt, ...) \
+  printf("DEBUG: [%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 #else
 #define LOG_DEBUG(fmt, ...) (void)(fmt)
 #endif
