@@ -6,6 +6,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "No build type specified, defaulting to Release")
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+endif()
+
 set(MOONGEM_EXE moongem)
 set(MOONGEM_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(MOONGEM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -17,8 +22,10 @@ set(SRC_FILES
   "${MOONGEM_SRC_DIR}/net.c"
   "${MOONGEM_SRC_DIR}/util.c")
 
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -ggdb")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -ffunction-sections -flto -O2 -fmerge-all-constants -fdata-sections")
+set(CMAKE_C_FLAGS_DEBUG
+  "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -ggdb")
+set(CMAKE_C_FLAGS_RELEASE
+  "${CMAKE_C_FLAGS_RELEASE} -ffunction-sections -flto -O2 -fmerge-all-constants -fdata-sections")
 
 find_package(OpenSSL 1.1.1 REQUIRED)
 find_package(Lua 5.4 REQUIRED)
@@ -34,6 +41,8 @@ target_include_directories(${MOONGEM_EXE} PRIVATE
   ${LIBMAGIC_INCLUDES}
   ${LUA_INCLUDE_DIR}
   ${OPENSSL_INCLUDE_DIR})
+
+install(TARGETS ${MOONGEM_EXE} DESTINATION bin)
 
 if(DISABLE_LOGGING)
   target_compile_definitions(${MOONGEM_EXE} PRIVATE MOONGEM_DISABLE_LOGGING)
