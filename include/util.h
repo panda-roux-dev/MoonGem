@@ -2,9 +2,11 @@
 #define UTIL_H
 
 #include <limits.h>
-#include <net.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+
+#include "net.h"
 
 #define BUFFER_APPEND_FAILURE INT_MIN
 
@@ -20,19 +22,26 @@ int buffer_append(text_buffer_t* buf, char* contents, size_t length);
 
 void destroy_buffer(text_buffer_t* buf);
 
+bool path_is_gmi(const char* path);
+
+bool is_dir(const char* path);
+
+char* append_default_doc(const request_t* request);
+
+bool path_is_illegal(const char* path);
+
 void clear_buffer(text_buffer_t* buf);
+
+int get_env_int(const char* name, int default_value);
+
+size_t response_body_static_file_cb(size_t max, char* buffer, void* data);
+
+void response_static_file_cleanup_cb(void* data);
 
 /*
  * Returns 0 if the operation failed
  */
 int check_privileges(void);
-
-/*
- * Creates a new buffer at `*buffer` and copies the contents of a static file at
- * `path` into it.  The size of the file (in bytes) is stored in `*length`.
- */
-callback_result_t serve_static(const char* path, FILE* file,
-                               response_t* response);
 
 size_t read_file(const char* path, char** contents);
 

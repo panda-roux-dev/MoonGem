@@ -11,6 +11,68 @@
 
 #define BUFFER_DEFAULT_SIZE 1024
 #define FILE_BUFFER_SIZE 2048
+#define DEFAULT_DOCUMENT "index.gmi"
+#define EXT_GMI ".gmi"
+#define INVALID_URL_PATTERNS "/..", "/.", "/../", "/./", "~/", "$"
+
+int get_env_int(const char* name, int default_value) {
+  char* str = getenv(name);
+  int value = default_value;
+  if (str != NULL) {
+    value = (int)atol(str);
+    if (value == 0) {
+      LOG_ERROR("Invalid value \"%s\" provided for %s", str, name);
+      value = default_value;
+    }
+  }
+
+  return value;
+}
+
+bool path_is_gmi(const char* path) {
+  if (path == NULL) {
+    return false;
+  }
+
+  return strcmp(strrchr(path, '.'), EXT_GMI) == 0;
+}
+
+bool is_dir(const char* path) { return strrchr(path, '.') == NULL; }
+
+char* append_default_doc(const request_t* request) {
+  size_t path_buf_len =
+      (request->path_length) + sizeof(DEFAULT_DOCUMENT) / sizeof(char);
+  char* path = malloc((path_buf_len + 1) * sizeof(char));
+  if (path == NULL) {
+    LOG_ERROR("Failed to append default document name to URL");
+    return NULL;
+  }
+
+  memcpy(path, request->path, request->path_length * sizeof(char));
+  if (request->path[request->path_length - 1] != '/') {
+    path[request->path_length] = '/';
+    memcpy(&path[request->path_length + 1], &DEFAULT_DOCUMENT[0],
+           sizeof(DEFAULT_DOCUMENT));
+  } else {
+    memcpy(&path[request->path_length], &DEFAULT_DOCUMENT[0],
+           sizeof(DEFAULT_DOCUMENT));
+  }
+
+  path[path_buf_len] = '\0';
+
+  return path;
+}
+
+bool path_is_illegal(const char* path) {
+  const char* bad_strings[] = {INVALID_URL_PATTERNS};
+  for (int i = 0; i < sizeof(bad_strings) / sizeof(char*); ++i) {
+    if (strstr(path, bad_strings[i]) != NULL) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 text_buffer_t* create_buffer() {
   text_buffer_t* buf = malloc(sizeof(text_buffer_t));
@@ -137,22 +199,17 @@ char* get_mimetype(const char* path) {
   return result;
 }
 
-callback_result_t serve_static(const char* path, FILE* file,
-                               response_t* response) {
-  response->mimetype = get_mimetype(path);
-  response->status = STATUS_SUCCESS;
+size_t response_body_static_file_cb(size_t max, char* buffer, void* data) {
+  if (data == NULL) {
+    return 0;
+  }
 
-  fseek(file, 0, SEEK_END);
-  response->body_length = ftell(file);
-  response->body = malloc(response->body_length * sizeof(char));
-  if (response->body == NULL) {
-    LOG_ERROR("Failed to allocate %zu bytes of memory for %s",
-              response->body_length, path);
-    response->status = STATUS_PERMANENT_FAILURE;
-    response->meta = strdup("File is too large for the server to handle");
-    return ERROR;
-  }     fseek(file, 0, SEEK_SET);
-    fread(response->body, sizeof(char), response->body_length, file);
-    return OK;
- 
+  return fread(buffer, sizeof(char), max, (FILE*)data);
 }
+
+void response_static_file_cleanup_cb(void* data) {
+  if (data != NULL) {
+    fclose((FILE*)data);
+  }
+}
+

@@ -12,28 +12,33 @@
 #define LINE_SCRIPT_END ">>-"
 #define DELIM_SIZE ((sizeof(LINE_SCRIPT_START) - 1) / sizeof(char))
 #define LINE_BUFFER_SIZE 2048
-#define MIMETYPE_GEMTEXT "text/gemini; encoding=utf-8"
 #define MAX_LANGUAGE_LEN 32
 
 typedef enum { TEXT, SCRIPT_START, SCRIPT_END } line_type_t;
 
-typedef struct {
+typedef struct doc_state_t {
   text_buffer_t* output_buffer;
   text_buffer_t* script_buffer;
   script_ctx_t* script_ctx;
   bool script_mode;
 } doc_state_t;
 
-static doc_state_t create_doc_state(const char* path) {
-  doc_state_t state = {create_buffer(), create_buffer(), init_script(path),
-                       false};
+static doc_state_t* create_doc_state(const char* path) {
+  doc_state_t* state = (doc_state_t*)malloc(sizeof(doc_state_t));
+  state->output_buffer = create_buffer();
+  state->script_buffer = create_buffer();
+  state->script_ctx = init_script(path);
+  state->script_mode = false;
   return state;
 }
 
 static void destroy_doc_state(doc_state_t* state) {
-  destroy_buffer(state->output_buffer);
-  destroy_buffer(state->script_buffer);
-  destroy_script(state->script_ctx);
+  if (state != NULL) {
+    destroy_buffer(state->output_buffer);
+    destroy_buffer(state->script_buffer);
+    destroy_script(state->script_ctx);
+    free(state);
+  }
 }
 
 static line_type_t get_line_type(char* line) {
@@ -99,38 +104,78 @@ static bool parse_line(char* line, doc_state_t* state) {
   return true;
 }
 
-int parse_response_from_file(FILE* file, const request_t* request,
-                             response_t* response) {
-  bool line_error = false;
-  doc_state_t state = create_doc_state(request->path);
-  char buffer[LINE_BUFFER_SIZE];
-  while (fgets(&buffer[0], sizeof(buffer) / sizeof(char), file)) {
-    if (!parse_line(&buffer[0], &state)) {
-      line_error = true;
-      break;
-    }
-  }
-
-  callback_result_t result;
-  if (line_error) {
-    response->status = STATUS_CGI_ERROR;
-    response->meta = strdup("Error reading file");
-    result = ERROR;
-  } else {
-    response->body =
-        strndup(state.output_buffer->buffer, state.output_buffer->length);
-    response->body_length = state.output_buffer->length;
-    response->status = STATUS_SUCCESS;
-    response->mimetype = strdup(MIMETYPE_GEMTEXT);
-    if (state.script_ctx->language != NULL) {
-      response->language =
-          strndup(state.script_ctx->language, MAX_LANGUAGE_LEN);
-    }
-    result = OK;
-  }
-
-  destroy_doc_state(&state);
-
-  return result;
+parser_t* create_doc_parser(response_t* response, FILE* file, char* path) {
+  parser_t* parser = (parser_t*)malloc(sizeof(parser_t));
+  parser->doc_state = create_doc_state(path);
+  parser->file = file;
+  parser->response = response;
+  parser->processed = false;
+  parser->written = 0;
+  return parser;
 }
 
+void destroy_doc_parser(parser_t* parser) {
+  if (parser != NULL) {
+    destroy_doc_state(parser->doc_state);
+    fclose(parser->file);
+    free(parser);
+  }
+}
+
+static size_t write_to_body_buffer(size_t max, size_t* written, char* buffer,
+                                   text_buffer_t* rendered) {
+  size_t len = rendered->length - *written < max ? rendered->length : max;
+  memcpy(buffer, &rendered->buffer[*written], len * sizeof(char));
+  *written += len;
+  return len;
+}
+
+size_t response_body_parser_cb(size_t max, char* buffer, void* data) {
+  if (data == NULL) {
+    return 0;
+  }
+
+  parser_t* parser = (parser_t*)data;
+  text_buffer_t* rendered = parser->doc_state->output_buffer;
+
+  if (parser->processed) {
+    // document parsed; return the next batch from the output buffer
+    if (parser->written >= rendered->length) {
+      // finished
+      return 0;
+    }
+
+    return write_to_body_buffer(max, &parser->written, buffer, rendered);
+  }     // document not yet parsed, so read it and return the first batch from the
+    // output buffer
+
+    bool line_error = false;
+    char line[LINE_BUFFER_SIZE];
+    while (fgets(&line[0], sizeof(line) / sizeof(char), parser->file)) {
+      if (!parse_line(&line[0], parser->doc_state)) {
+        line_error = true;
+        break;
+      }
+    }
+
+    // scripts have been run and the document has been fully rendered, so we
+    // don't need to come back here
+    parser->processed = true;
+
+    if (line_error) {
+      // script error; bail without writing any body
+      parser->response->status = STATUS_CGI_ERROR;
+      parser->response->meta = strdup("Error reading file");
+      return 0;
+    }
+
+    // no error; write first chunk to body buffer
+    return write_to_body_buffer(max, &parser->written, buffer, rendered);
+ 
+}
+
+void response_parser_cleanup_cb(void* data) {
+  if (data != NULL) {
+    destroy_doc_parser((parser_t*)data);
+  }
+}

@@ -18,6 +18,7 @@
 
 #define MAX_URL_LENGTH 1024
 #define MAX_META_LENGTH 1024
+#define RESPONSE_BODY_BUFFER_LENGTH 4096
 #define HEADER_BUFFER_LENGTH 1029  // code(2) + space(1) + meta(1024) + \r\n
 
 #define ERROR_MSG "Server error"
@@ -40,6 +41,7 @@ static int create_socket(int port) {
 
   int sock = socket(AF_INET6, SOCK_STREAM, 0);
 
+  // accept either IPv4 or IPv6
   setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &OPT_OFF, sizeof(OPT_OFF));
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &OPT_ON, sizeof(OPT_ON));
 
@@ -244,11 +246,11 @@ static char* build_response_header(int status, char* meta, size_t* length) {
   }
 
   if (header_len >= HEADER_BUFFER_LENGTH || header_len <= 0) {
-    LOG_ERROR("Failed to generate a request header");
+    LOG_ERROR("Failed to generate a response header");
     return NULL;
   }
 
-  LOG_DEBUG("Generated a request header of length %zu", header_len);
+  LOG_DEBUG("Generated a response header of length %zu", header_len);
   *length = header_len;
 
   // return a copy of the header in a heap-allocated buffer
@@ -319,10 +321,6 @@ static void send_status_response(SSL* ssl, int code, const char* meta) {
 }
 
 static void free_response_fields(response_t* response) {
-  if (response->body != NULL) {
-    free(response->body);
-  }
-
   if (response->meta != NULL) {
     free(response->meta);
   }
@@ -336,7 +334,8 @@ static void free_response_fields(response_t* response) {
   }
 }
 
-static void handle_success_response(SSL* ssl, response_t* response) {
+static void handle_success_response(SSL* ssl, response_t* response,
+                                    response_body_builder_t* builder) {
   // first generate a response header
   size_t header_length = 0;
   char* tags = build_tags(response);
@@ -351,41 +350,28 @@ static void handle_success_response(SSL* ssl, response_t* response) {
     return;
   }
 
-  // if the length of the response's body is zero, we're done; just return the
-  // header content
-  //
-  // otherwise, if there's a response body we need to accomodate,
-  // expand the header buffer to (header + body) length and copy in the body
+  SSL_write(ssl, header, header_length);
+  if (builder != NULL && builder->build_body != NULL) {
+    size_t current_length = 0;
+    char buffer[RESPONSE_BODY_BUFFER_LENGTH];
+    response_body_callback_t build_func = builder->build_body;
+    for (;;) {
+      if ((current_length = build_func(sizeof(buffer) / sizeof(char),
+                                       &buffer[0], builder->data)) == 0) {
+        // finished
+        break;
+      }
 
-  char* body = NULL;
-  size_t total_length = header_length;
-  if (response->body_length == 0) {
-    LOG_DEBUG("Sending a response with no body");
-    body = header;
-  } else {
-    total_length += response->body_length;
-    body = realloc(header, total_length * sizeof(char));
-    if (body == NULL) {
-      LOG_ERROR(
-          "Failed to allocate enough memory (%zu bytes) to accomodate the "
-          "response body",
-          total_length);
+      LOG_DEBUG("Sending %zu bytes to the client", current_length);
 
-      // header wasn't free'd if an error occurred
-      free(header);
-
-      send_status_response(ssl, STATUS_TEMPORARY_FAILURE, ERROR_MSG);
-      return;
+      SSL_write(ssl, &buffer[0], current_length);
     }
-
-    memcpy(&body[header_length], response->body,
-           response->body_length * sizeof(char));
   }
 
-  LOG_DEBUG("Sending SUCCESS response of %zu bytes", total_length);
-
-  SSL_write(ssl, body, total_length);
-  free(body);
+  response_cleanup_callback_t cleanup = builder->cleanup;
+  if (cleanup != NULL) {
+    cleanup(builder->data);
+  }
 }
 
 static void handle_redirect_response(SSL* ssl, response_t* response) {
@@ -424,10 +410,11 @@ static void send_body_response(SSL* ssl, size_t path_length,
   response_t response;
   memset(&response, 0, sizeof(response_t));
 
-  switch (callback(&request, &response)) {
+  response_body_builder_t builder;
+  switch (callback(&request, &response, &builder)) {
     case OK:
       LOG_DEBUG("Sending SUCCESS response");
-      handle_success_response(ssl, &response);
+      handle_success_response(ssl, &response, &builder);
       break;
     case REDIRECT:
       LOG_DEBUG("Sending REDIRECT response");
@@ -445,6 +432,14 @@ static void send_body_response(SSL* ssl, size_t path_length,
   }
 
   free_response_fields(&response);
+}
+
+void init_body_builder(response_body_builder_t* builder,
+                       response_body_callback_t body_cb,
+                       response_cleanup_callback_t cleanup, void* data) {
+  builder->build_body = body_cb;
+  builder->cleanup = cleanup;
+  builder->data = data;
 }
 
 void handle_requests(net_t* net, request_callback_t callback) {
