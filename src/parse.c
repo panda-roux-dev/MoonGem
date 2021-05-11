@@ -124,7 +124,8 @@ void destroy_doc_parser(parser_t* parser) {
 
 static size_t write_to_body_buffer(size_t max, size_t* written, char* buffer,
                                    text_buffer_t* rendered) {
-  size_t len = rendered->length - *written < max ? rendered->length : max;
+  size_t remaining = rendered->length - *written;
+  size_t len = remaining < max ? remaining : max;
   memcpy(buffer, &rendered->buffer[*written], len * sizeof(char));
   *written += len;
   return len;
@@ -146,32 +147,31 @@ size_t response_body_parser_cb(size_t max, char* buffer, void* data) {
     }
 
     return write_to_body_buffer(max, &parser->written, buffer, rendered);
-  }     // document not yet parsed, so read it and return the first batch from the
-    // output buffer
+  }  // document not yet parsed, so read it and return the first batch from the
+  // output buffer
 
-    bool line_error = false;
-    char line[LINE_BUFFER_SIZE];
-    while (fgets(&line[0], sizeof(line) / sizeof(char), parser->file)) {
-      if (!parse_line(&line[0], parser->doc_state)) {
-        line_error = true;
-        break;
-      }
+  bool line_error = false;
+  char line[LINE_BUFFER_SIZE];
+  while (fgets(&line[0], sizeof(line) / sizeof(char), parser->file)) {
+    if (!parse_line(&line[0], parser->doc_state)) {
+      line_error = true;
+      break;
     }
+  }
 
-    // scripts have been run and the document has been fully rendered, so we
-    // don't need to come back here
-    parser->processed = true;
+  // scripts have been run and the document has been fully rendered, so we
+  // don't need to come back here
+  parser->processed = true;
 
-    if (line_error) {
-      // script error; bail without writing any body
-      parser->response->status = STATUS_CGI_ERROR;
-      parser->response->meta = strdup("Error reading file");
-      return 0;
-    }
+  if (line_error) {
+    // script error; bail without writing any body
+    parser->response->status = STATUS_CGI_ERROR;
+    parser->response->meta = strdup("Error reading file");
+    return 0;
+  }
 
-    // no error; write first chunk to body buffer
-    return write_to_body_buffer(max, &parser->written, buffer, rendered);
- 
+  // no error; write first chunk to body buffer
+  return write_to_body_buffer(max, &parser->written, buffer, rendered);
 }
 
 void response_parser_cleanup_cb(void* data) {
