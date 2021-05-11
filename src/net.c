@@ -372,6 +372,8 @@ static void handle_success_response(SSL* ssl, response_t* response,
   if (cleanup != NULL) {
     cleanup(builder->data);
   }
+
+  free(header);
 }
 
 static void handle_redirect_response(SSL* ssl, response_t* response) {
