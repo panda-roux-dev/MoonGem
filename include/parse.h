@@ -16,7 +16,7 @@ typedef struct {
   bool processed;
 } parser_t;
 
-parser_t* create_doc_parser(response_t* response, FILE* file, char* path);
+parser_t* create_doc_parser(response_t* response, FILE* file, const char* path);
 
 void destroy_doc_parser(parser_t* parser);
 

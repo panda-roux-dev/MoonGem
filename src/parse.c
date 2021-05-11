@@ -104,7 +104,8 @@ static bool parse_line(char* line, doc_state_t* state) {
   return true;
 }
 
-parser_t* create_doc_parser(response_t* response, FILE* file, char* path) {
+parser_t* create_doc_parser(response_t* response, FILE* file,
+                            const char* path) {
   parser_t* parser = (parser_t*)malloc(sizeof(parser_t));
   parser->doc_state = create_doc_state(path);
   parser->file = file;

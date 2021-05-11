@@ -47,7 +47,7 @@ static callback_result_t handle_request(const request_t* request,
   if (path_is_gmi(path)) {
     // parse .gmi files into gemtext
 
-    parser_t* parser = create_doc_parser(response, file, path);
+    parser_t* parser = create_doc_parser(response, file, request->path);
     init_body_builder(builder, response_body_parser_cb,
                       response_parser_cleanup_cb, parser);
 
@@ -61,7 +61,7 @@ static callback_result_t handle_request(const request_t* request,
     init_body_builder(builder, response_body_static_file_cb,
                       response_static_file_cleanup_cb, file);
 
-    response->mimetype = get_mimetype(path);
+    response->mimetype = get_mimetype(path + 1);
 
     result = OK;
   }
