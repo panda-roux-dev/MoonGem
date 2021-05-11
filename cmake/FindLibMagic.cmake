@@ -24,6 +24,12 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #-------------------------------------------------------------------------------
 
+# ******************************************************************************
+# modification by panda-roux (5/10/2021):
+# updated the call to find_package_handle_standard_args to use the name
+# 'LibMagic' instead of 'LIBMAGIC` so as to avoid annoying CMake warnings
+# ******************************************************************************
+
 # - Check for the presence of LIBMAGIC
 #
 # The following variables are set when LIBMAGIC is found:
@@ -73,7 +79,7 @@ if (NOT LIBMAGIC_FOUND)
   ##____________________________________________________________________________
   ## Actions taken when all components have been found
 
-  find_package_handle_standard_args (LIBMAGIC DEFAULT_MSG LIBMAGIC_LIBRARIES LIBMAGIC_INCLUDES)
+  find_package_handle_standard_args (LibMagic DEFAULT_MSG LIBMAGIC_LIBRARIES LIBMAGIC_INCLUDES)
 
   if (LIBMAGIC_FOUND)
     if (NOT LIBMAGIC_FIND_QUIETLY)
