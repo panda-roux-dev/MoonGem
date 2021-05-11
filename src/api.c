@@ -23,9 +23,6 @@ int api_head_set_lang(lua_State* L) { return 0; }
 
 int api_body_include(lua_State* L) {
   const char* path = luaL_checkstring(L, 2);
-  if (path == NULL) {
-    return 0;
-  }
 
   char* contents = NULL;
   size_t file_len = read_file(path, &contents);
@@ -49,9 +46,6 @@ int api_body_include(lua_State* L) {
 
 int api_body_write(lua_State* L) {
   const char* text = luaL_checkstring(L, 2);
-  if (text == NULL) {
-    return 0;
-  }
 
   lua_getfield(L, 1, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_BUFFER);
@@ -66,9 +60,6 @@ int api_body_write(lua_State* L) {
 
 int api_body_line(lua_State* L) {
   const char* text = luaL_checkstring(L, 2);
-  if (text == NULL) {
-    return 0;
-  }
 
   lua_getfield(L, 1, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_BUFFER);
@@ -83,14 +74,11 @@ int api_body_line(lua_State* L) {
 
 int api_body_link(lua_State* L) {
   const char* url = luaL_checkstring(L, 2);
-  if (url == NULL) {
-    return 0;
-  }
 
   lua_getfield(L, 1, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_BUFFER);
 
-  if (lua_gettop(L) == 2) {
+  if (!lua_isstring(L, 3)) {
     // URL only, no alt-text
 
     lua_pushfstring(L, LINK_TOKEN " %s" NEWLINE, url);
@@ -98,10 +86,6 @@ int api_body_link(lua_State* L) {
     // URL + alt-text
 
     const char* alt = luaL_checkstring(L, 3);
-    if (alt == NULL) {
-      return 0;
-    }
-
     lua_pushfstring(L, LINK_TOKEN " %s %s" NEWLINE, url, alt);
   }
 
@@ -113,9 +97,6 @@ int api_body_link(lua_State* L) {
 
 int api_body_heading(lua_State* L) {
   const char* text = luaL_checkstring(L, 2);
-  if (text == NULL) {
-    return 0;
-  }
 
   int level = luaL_optinteger(L, 3, 1);
 
@@ -136,9 +117,6 @@ int api_body_heading(lua_State* L) {
 
 int api_body_quote(lua_State* L) {
   const char* text = luaL_checkstring(L, 2);
-  if (text == NULL) {
-    return 0;
-  }
 
   lua_getfield(L, 1, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_BUFFER);
@@ -153,14 +131,12 @@ int api_body_quote(lua_State* L) {
 
 int api_body_block(lua_State* L) {
   const char* text = luaL_checkstring(L, 2);
-  if (text == NULL) {
-    return 0;
-  }
 
   lua_getfield(L, 1, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_BUFFER);
 
-  lua_pushfstring(L, BLOCK_TOKEN NEWLINE "%s" NEWLINE BLOCK_TOKEN, text);
+  lua_pushfstring(L, BLOCK_TOKEN NEWLINE "%s" NEWLINE BLOCK_TOKEN NEWLINE,
+                  text);
 
   lua_concat(L, 2);
   lua_setfield(L, -2, FLD_BUFFER);
