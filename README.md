@@ -88,6 +88,16 @@ Writes the beginning of a preformatted block with optional [alt-text].
 `BODY:end_block()`
 Writes the end of a preformatted block.
 
+---
+
+`HEAD:set_lang(<language>)`
+Sets the language tag in the response header.
+
+---
+
+`HEAD:get_input([prompt]), HEAD:get_sensitive_input([prompt])`
+Prompts the client for input and returns the result.
+
 ## Source
 
 [The source code can be found here](https://git.sr.ht/~panda-roux/MoonGem/)
