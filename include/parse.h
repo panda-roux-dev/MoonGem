@@ -11,12 +11,14 @@ struct doc_state_t;
 typedef struct {
   size_t written;
   struct doc_state_t* doc_state;
+  const request_t* request;
   response_t* response;
   FILE* file;
   bool processed;
 } parser_t;
 
-parser_t* create_doc_parser(response_t* response, FILE* file, const char* path);
+parser_t* create_doc_parser(const request_t* request, response_t* response,
+                            FILE* file);
 
 void destroy_doc_parser(parser_t* parser);
 

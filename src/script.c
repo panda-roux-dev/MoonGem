@@ -12,6 +12,8 @@
 
 #define TBL_HEADER "HEAD"
 #define FUNC_LANG "set_lang"
+#define FUNC_INPUT "get_input"
+#define FUNC_CERT "get_certificate"
 
 #define TBL_BODY "BODY"
 #define FUNC_INCLUDE "include"
@@ -28,6 +30,10 @@
  * Forward-declare methods defined in api.c
  */
 int api_head_set_lang(lua_State* L);
+
+int api_head_get_input(lua_State* L);
+
+int api_head_get_cert(lua_State* L);
 
 int api_body_include(lua_State* L);
 
@@ -89,33 +95,80 @@ static void add_body_api_methods(lua_State* L) {
 static void add_header_api_methods(lua_State* L) {
   lua_newtable(L);
 
-  lua_getglobal(L, TBL_HEADER);
-  lua_setfield(L, -2, TBL_HEADER);
-
   lua_pushcfunction(L, api_head_set_lang);
   lua_setfield(L, -2, FUNC_LANG);
+
+  lua_pushcfunction(L, api_head_get_input);
+  lua_setfield(L, -2, FUNC_INPUT);
+
+  lua_pushcfunction(L, api_head_get_cert);
+  lua_setfield(L, -2, FUNC_CERT);
 
   lua_setglobal(L, TBL_HEADER);
 }
 
-static void init_scripting_api(lua_State* L) {
+static void add_response_ptr(lua_State* L, response_t* response) {
+  lua_getglobal(L, TBL_RESPONSE);
+  lua_pushlightuserdata(L, response);
+  lua_setfield(L, -2, FLD_RESPONSE_PTR);
+  lua_pop(L, lua_gettop(L));
+}
+
+static void init_scripting_api(lua_State* L, const request_t* request,
+                               response_t* response) {
   luaL_openlibs(L);
 
   // add global response table
   lua_newtable(L);
   lua_setglobal(L, TBL_RESPONSE);
 
+  // set the PATH global variable
+  lua_pushstring(L, request->path + 1);
+  lua_setglobal(L, FLD_PATH);
+
+  // add user input as a global variable, if present
+  if (request->input != NULL) {
+    lua_pushstring(L, request->input);
+    lua_setglobal(L, FLD_INPUT);
+  }
+
   add_body_api_methods(L);
+  add_header_api_methods(L);
+  add_response_ptr(L, response);
 }
 
 static void init_response_buffer(lua_State* L) {
   lua_getglobal(L, TBL_RESPONSE);
   lua_pushliteral(L, "\0");
-  lua_setfield(L, 1, FLD_BUFFER);
+  lua_setfield(L, -2, FLD_BUFFER);
   lua_pop(L, 1);
 }
 
-script_ctx_t* init_script(const char* path) {
+static void add_package_path(lua_State* L, const char* path) {
+  if (path == NULL) {
+    return;
+  }
+
+  // skip the first forward-slash
+  ++path;
+
+  // add the request path to package.path
+  lua_getglobal(L, "package");
+  lua_getfield(L, -1, "path");
+  if (strrchr(path, '.') != NULL) {
+    char* dir = dirname((char*)path);
+    lua_pushfstring(L, ";./%s/?.lua", dir);
+    lua_pushfstring(L, ";./%s/?", dir);
+  } else {
+    lua_pushfstring(L, ";./%s/?.lua", path);
+    lua_pushfstring(L, ";./%s/?", path);
+  }
+
+  lua_concat(L, 3);
+  lua_setfield(L, -2, "path");
+}
+
+script_ctx_t* init_script(const request_t* request, response_t* response) {
   script_ctx_t* ctx = malloc(sizeof(script_ctx_t));
   if (ctx == NULL) {
     LOG_ERROR("Failed to allocate space for the script context");
@@ -125,14 +178,10 @@ script_ctx_t* init_script(const char* path) {
   ctx->result = NULL;
   ctx->result_len = 0;
   ctx->language = NULL;
-  ctx->path = NULL;
-
-  if (path != NULL) {
-    ctx->path = strdup(path);
-  }
 
   ctx->L = luaL_newstate();
-  init_scripting_api(ctx->L);
+  init_scripting_api(ctx->L, request, response);
+  add_package_path(ctx->L, request->path);
 
   return ctx;
 }
@@ -151,10 +200,6 @@ void destroy_script(script_ctx_t* ctx) {
       free(ctx->result);
     }
 
-    if (ctx->path != NULL) {
-      free(ctx->path);
-    }
-
     free(ctx);
   }
 }
@@ -170,26 +215,6 @@ int run_script(script_ctx_t* ctx, char* contents) {
     ctx->result = NULL;
   }
 
-  if (ctx->path != NULL) {
-    // set the PATH global variable
-    lua_pushstring(L, ctx->path);
-    lua_setglobal(L, FLD_PATH);
-
-    // add the request path to package.path
-    lua_getglobal(L, "package");
-    lua_getfield(L, -1, "path");
-    if (strrchr(ctx->path, '.') != NULL) {
-      char* dir = dirname(ctx->path);
-      lua_pushfstring(L, ";./%s/?.lua", dir);
-      lua_pushfstring(L, ";./%s/?", dir);
-    } else {
-      lua_pushfstring(L, ";./%s/?.lua", ctx->path);
-      lua_pushfstring(L, ";./%s/?", ctx->path);
-    }
-    lua_concat(L, 3);
-    lua_setfield(L, -2, "path");
-  }
-
   if (luaL_dostring(L, contents) != LUA_OK) {
     LOG_ERROR("Error running Lua script: %s", lua_tostring(L, -1));
     return RUN_SCRIPT_FAILURE;
@@ -203,16 +228,6 @@ int run_script(script_ctx_t* ctx, char* contents) {
   if (lua_isnoneornil(L, -1)) {
     return RUN_SCRIPT_FAILURE;
   }
-
-  // get language field
-  lua_getfield(L, -1, FLD_LANG);
-  if (!lua_isnoneornil(L, -1) && lua_isstring(L, -1)) {
-    size_t lang_len = 0;
-    const char* lang = lua_tolstring(L, -1, &lang_len);
-    ctx->language = strndup(lang, lang_len);
-  }
-
-  lua_pop(L, 1);
 
   // get buffer field
   lua_getfield(L, -1, FLD_BUFFER);

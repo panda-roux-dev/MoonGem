@@ -14,21 +14,14 @@
 #define VAR_MOONGEM_PORT "MOONGEM_PORT"
 #define MIMETYPE_GEMTEXT "text/gemini; encoding=utf-8"
 
-static void set_response_status(response_t* response, int status,
-                                const char* msg) {
-  response->status = status;
-  response->meta = strdup(msg);
-}
-
 static callback_result_t handle_request(const request_t* request,
                                         response_t* response,
                                         response_body_builder_t* builder) {
-  char* path;
-  if (is_dir(request->path)) {
-    path = append_default_doc(request);
-  } else {
-    path = strndup(request->path, request->path_length);
-  }
+  // if the requested path is a directory, append the default document
+  // 'index.gmi' onto it for the purposes of file IO
+  char* path = is_dir(request->path)
+                   ? append_default_doc(request)
+                   : strndup(request->path, request->path_length);
 
   callback_result_t result = ERROR;
 
@@ -40,19 +33,17 @@ static callback_result_t handle_request(const request_t* request,
 
   FILE* file = fopen(path + 1, "rb");
   if (file == NULL) {
-    set_response_status(response, STATUS_NOT_FOUND, "File does not exist");
+    set_response_status(response, STATUS_NOT_FOUND, strerror(errno));
     goto finish;
   }
 
   if (path_is_gmi(path)) {
     // parse .gmi files into gemtext
 
-    parser_t* parser = create_doc_parser(response, file, request->path);
+    parser_t* parser = create_doc_parser(request, response, file);
     init_body_builder(builder, response_body_parser_cb,
                       response_parser_cleanup_cb, parser);
-
     response->mimetype = strdup(MIMETYPE_GEMTEXT);
-
     result = OK;
   } else {
     // serve any file that doesn't have a .gmi extension in a simple static
@@ -60,9 +51,7 @@ static callback_result_t handle_request(const request_t* request,
 
     init_body_builder(builder, response_body_static_file_cb,
                       response_static_file_cleanup_cb, file);
-
     response->mimetype = get_mimetype(path + 1);
-
     result = OK;
   }
 

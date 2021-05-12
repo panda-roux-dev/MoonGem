@@ -23,11 +23,12 @@ typedef struct doc_state_t {
   bool script_mode;
 } doc_state_t;
 
-static doc_state_t* create_doc_state(const char* path) {
+static doc_state_t* create_doc_state(const request_t* request,
+                                     response_t* response) {
   doc_state_t* state = (doc_state_t*)malloc(sizeof(doc_state_t));
   state->output_buffer = create_buffer();
   state->script_buffer = create_buffer();
-  state->script_ctx = init_script(path);
+  state->script_ctx = init_script(request, response);
   state->script_mode = false;
   return state;
 }
@@ -104,10 +105,10 @@ static bool parse_line(char* line, doc_state_t* state) {
   return true;
 }
 
-parser_t* create_doc_parser(response_t* response, FILE* file,
-                            const char* path) {
+parser_t* create_doc_parser(const request_t* request, response_t* response,
+                            FILE* file) {
   parser_t* parser = (parser_t*)malloc(sizeof(parser_t));
-  parser->doc_state = create_doc_state(path);
+  parser->doc_state = create_doc_state(request, response);
   parser->file = file;
   parser->response = response;
   parser->processed = false;
@@ -156,6 +157,11 @@ size_t response_body_parser_cb(size_t max, char* buffer, void* data) {
   while (fgets(&line[0], sizeof(line) / sizeof(char), parser->file)) {
     if (!parse_line(&line[0], parser->doc_state)) {
       line_error = true;
+      break;
+    }
+
+    if (parser->response->interrupted) {
+      // script interrupted the response; stop proccessing lines
       break;
     }
   }

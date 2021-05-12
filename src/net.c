@@ -25,6 +25,8 @@
 
 #define URL_SCHEME "gemini://"
 #define URL_TERMINATOR "\r\n"
+#define URL_INPUT_DELIMITER '?'
+#define URL_PATH_DELIMITER '/'
 
 static volatile sig_atomic_t terminate = 0;
 static volatile sig_atomic_t stop = 0;
@@ -154,6 +156,27 @@ static void wait_until_continue(void) {
   }
 }
 
+static char* extract_input(char* request) {
+  char* term = strstr(request, URL_TERMINATOR);
+  if (term == NULL) {
+    return NULL;
+  }
+
+  char* input_delim = memchr(request, URL_INPUT_DELIMITER, term - request);
+  if (input_delim == NULL) {
+    return NULL;
+  }
+
+  ++input_delim;  // skip delimiter
+
+  size_t input_len = term - input_delim;
+  char* input = malloc((input_len + 1) * sizeof(char));
+  memcpy(input, input_delim, input_len * sizeof(char));
+  input[input_len] = '\0';
+
+  return input;
+}
+
 static int extract_path(char* request, char* buffer, size_t* length) {
   // first check that the request body begins with the URL scheme
   if (strstr(request, URL_SCHEME) != request) {
@@ -169,16 +192,23 @@ static int extract_path(char* request, char* buffer, size_t* length) {
     return EXTRACT_PATH_FAILURE;
   }
 
+  // check for input after the path
+  char* input_delim =
+      memchr(host_begin, URL_INPUT_DELIMITER, term - host_begin);
+
   // path (if one exists) is everything between the first forward-slash after
-  // the host and the \r\n terminator
+  // the host and either the "?" input delimiter or the \r\n terminator
+
   char* path = memchr(host_begin, '/', term - host_begin);
+
+  size_t len = input_delim == NULL || input_delim > term ? term - path
+                                                         : input_delim - path;
 
   // check if a path exists; if so, copy it into the buffer.
   //
   // otherwise, set length to zero and set up the buffer as an empty string
-  size_t len;
+
   if (path != NULL) {
-    len = term - path;
     memcpy(buffer, path, len);
     buffer[len] = '\0';
   } else {
@@ -320,6 +350,11 @@ static void send_status_response(SSL* ssl, int code, const char* meta) {
   }
 }
 
+void set_response_status(response_t* response, int status, const char* msg) {
+  response->status = status;
+  response->meta = strdup(msg);
+}
+
 static void free_response_fields(response_t* response) {
   if (response->meta != NULL) {
     free(response->meta);
@@ -336,35 +371,57 @@ static void free_response_fields(response_t* response) {
 
 static void handle_success_response(SSL* ssl, response_t* response,
                                     response_body_builder_t* builder) {
-  // first generate a response header
-  size_t header_length = 0;
-  char* tags = build_tags(response);
-  char* header = build_response_header(STATUS_SUCCESS, tags, &header_length);
-
-  if (tags != NULL) {
-    free(tags);
-  }
-
-  if (header == NULL) {
-    LOG_ERROR("No response header allocated");
-    return;
-  }
-
-  SSL_write(ssl, header, header_length);
   if (builder != NULL && builder->build_body != NULL) {
-    size_t current_length = 0;
     char buffer[RESPONSE_BODY_BUFFER_LENGTH];
     response_body_callback_t build_func = builder->build_body;
-    for (;;) {
-      if ((current_length = build_func(sizeof(buffer) / sizeof(char),
-                                       &buffer[0], builder->data)) == 0) {
-        // finished
-        break;
+
+    // run the body builder function once; this gives any scripts a chance to
+    // interrupt the response before a success header is sent.
+    //
+    // after this point, it can be assumed that all scripts have been run and
+    // that response->interrupted will be set if need be.  otherwise serve the
+    // rest of the body
+    size_t current_length =
+        build_func(sizeof(buffer) / sizeof(char), &buffer[0], builder->data);
+
+    if (!response->interrupted && current_length > 0) {
+      // no interruptions and we got data; send the header and first chunk of
+      // the body
+
+      // generate a SUCCESS response header
+      size_t header_length = 0;
+      char* tags = build_tags(response);
+      char* header =
+          build_response_header(STATUS_SUCCESS, tags, &header_length);
+      if (header == NULL) {
+        LOG_ERROR("Failed to allocate memory for the response header");
+        send_status_response(ssl, STATUS_TEMPORARY_FAILURE, ERROR_MSG);
+        return;
       }
 
-      LOG_DEBUG("Sending %zu bytes to the client", current_length);
-
+      SSL_write(ssl, header, header_length);
       SSL_write(ssl, &buffer[0], current_length);
+
+      // send the rest of the body
+      for (;;) {
+        if (response->interrupted ||
+            (current_length = build_func(sizeof(buffer) / sizeof(char),
+                                         &buffer[0], builder->data)) == 0) {
+          // finished
+          break;
+        }
+
+        LOG_DEBUG("Sending %zu bytes to the client", current_length);
+        SSL_write(ssl, &buffer[0], current_length);
+      }
+
+      free(header);
+    } else if (response->interrupted) {
+      // something in a script decided to end the response prematurely;
+      // send a status header accordingly
+
+      LOG_DEBUG("Response interrupted");
+      send_status_response(ssl, response->status, response->meta);
     }
   }
 
@@ -372,21 +429,6 @@ static void handle_success_response(SSL* ssl, response_t* response,
   if (cleanup != NULL) {
     cleanup(builder->data);
   }
-
-  free(header);
-}
-
-static void handle_redirect_response(SSL* ssl, response_t* response) {
-  if (response->meta == NULL) {
-    LOG_ERROR(
-        "Attempted to send a redirect response without specifying a "
-        "URL to redirect the client to!");
-    send_status_response(ssl, STATUS_TEMPORARY_FAILURE,
-                         "Error sending redirect response");
-    return;
-  }
-
-  send_status_response(ssl, STATUS_TEMPORARY_REDIRECT, response->meta);
 }
 
 static void handle_error_response(SSL* ssl, response_t* response) {
@@ -406,21 +448,16 @@ static void handle_error_response(SSL* ssl, response_t* response) {
 
 static void send_body_response(SSL* ssl, size_t path_length,
                                const char* const path,
-                               request_callback_t callback) {
-  request_t request = {path_length, path};
-
-  response_t response;
-  memset(&response, 0, sizeof(response_t));
+                               request_callback_t callback,
+                               const char* const input) {
+  request_t request = {path_length, path, input};
+  response_t response = {0, NULL, NULL, NULL, false};
 
   response_body_builder_t builder;
   switch (callback(&request, &response, &builder)) {
     case OK:
       LOG_DEBUG("Sending SUCCESS response");
       handle_success_response(ssl, &response, &builder);
-      break;
-    case REDIRECT:
-      LOG_DEBUG("Sending REDIRECT response");
-      handle_redirect_response(ssl, &response);
       break;
     case ERROR:
       LOG_DEBUG("Sending ERROR response");
@@ -484,10 +521,21 @@ void handle_requests(net_t* net, request_callback_t callback) {
             EXTRACT_PATH_FAILURE) {
           LOG_DEBUG(
               "Client sent an invalid request.  No path could be inferred.");
+
           send_status_response(ssl, STATUS_BAD_REQUEST, "Invalid URL");
         } else {
           LOG_DEBUG("Requested path: %s", path);
-          send_body_response(ssl, path_length, path, callback);
+
+          char* input = extract_input(&request_buffer[0]);
+          if (input != NULL) {
+            LOG_DEBUG("Received input: %s", input);
+          }
+
+          send_body_response(ssl, path_length, path, callback, input);
+
+          if (input != NULL) {
+            free(input);
+          }
         }
 
         free(path);
