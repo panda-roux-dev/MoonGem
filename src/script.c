@@ -13,6 +13,7 @@
 #define TBL_HEADER "HEAD"
 #define FUNC_LANG "set_lang"
 #define FUNC_INPUT "get_input"
+#define FUNC_INPUT_SENSITIVE "get_sensitive_input"
 #define FUNC_CERT "get_certificate"
 
 #define TBL_BODY "BODY"
@@ -32,6 +33,8 @@
 int api_head_set_lang(lua_State* L);
 
 int api_head_get_input(lua_State* L);
+
+int api_head_get_input_sensitive(lua_State* L);
 
 int api_head_get_cert(lua_State* L);
 
@@ -100,6 +103,9 @@ static void add_header_api_methods(lua_State* L) {
 
   lua_pushcfunction(L, api_head_get_input);
   lua_setfield(L, -2, FUNC_INPUT);
+
+  lua_pushcfunction(L, api_head_get_input_sensitive);
+  lua_setfield(L, -2, FUNC_INPUT_SENSITIVE);
 
   lua_pushcfunction(L, api_head_get_cert);
   lua_setfield(L, -2, FUNC_CERT);

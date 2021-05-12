@@ -55,6 +55,24 @@ int api_head_get_input(lua_State* L) {
   return 1;
 }
 
+int api_head_get_input_sensitive(lua_State* L) {
+  lua_getglobal(L, FLD_INPUT);
+  if (lua_isnoneornil(L, -1)) {
+    lua_getglobal(L, TBL_RESPONSE);
+    lua_getfield(L, -1, FLD_RESPONSE_PTR);
+    response_t* response = (response_t*)lua_touserdata(L, -1);
+
+    const char* prompt = luaL_checkstring(L, 2);
+    response->meta = strdup(prompt);
+    response->status = STATUS_SENSITIVE_INPUT;
+    response->interrupted = true;
+
+    return 0;
+  }
+
+  return 1;
+}
+
 int api_head_get_cert(lua_State* L) {
   // TODO
 
