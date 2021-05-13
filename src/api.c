@@ -99,6 +99,8 @@ int api_body_include(lua_State* L) {
     lua_setfield(L, -2, FLD_BUFFER);
   }
 
+  free(contents);
+
   return 0;
 }
 
