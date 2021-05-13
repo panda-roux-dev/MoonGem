@@ -31,8 +31,14 @@
 static volatile sig_atomic_t terminate = 0;
 static volatile sig_atomic_t stop = 0;
 
+static int client_cert_index = 0;
+
 static const int OPT_OFF = 0;
 static const int OPT_ON = 1;
+
+typedef struct {
+  unsigned char data[EVP_MAX_MD_SIZE];
+} hash_buffer_t;
 
 static int create_socket(int port) {
   struct sockaddr_in6 addr;
@@ -65,10 +71,109 @@ static int create_socket(int port) {
   return sock;
 }
 
-static void init_openssl(void) {
-  SSL_load_error_strings();
-  OpenSSL_add_ssl_algorithms();
+static void destroy_client_cert(client_cert_t* cert) {
+  if (cert != NULL) {
+    if (cert->fingerprint != NULL) {
+      free(cert->fingerprint);
+    }
+
+    free(cert);
+  }
 }
+
+static unsigned char* get_pubkey_from_x509(X509* certificate, size_t* len) {
+  EVP_PKEY* key = X509_get_pubkey(certificate);
+
+  // get key size
+  EVP_PKEY_get_raw_public_key(key, NULL, len);
+
+  // store key contents in a buffer
+  unsigned char* pubkey = malloc(sizeof(unsigned char) * (*len));
+  EVP_PKEY_get_raw_public_key(key, pubkey, len);
+
+  EVP_PKEY_free(key);
+
+  return pubkey;
+}
+
+static size_t compute_sha256_hash(hash_buffer_t* buf, unsigned char* msg,
+                                  size_t msg_len) {
+  const EVP_MD* digest = EVP_sha256();
+
+  EVP_MD_CTX* digest_ctx = EVP_MD_CTX_new();
+
+  unsigned int hash_len;
+  EVP_DigestInit(digest_ctx, digest);
+  EVP_DigestUpdate(digest_ctx, msg, msg_len);
+  EVP_DigestFinal_ex(digest_ctx, &buf->data[0], &hash_len);
+
+  EVP_MD_CTX_free(digest_ctx);
+
+  return hash_len;
+}
+
+static unsigned int get_x509_expiration(X509* certificate) {
+  ASN1_TIME* notafter = X509_get_notAfter(certificate);
+  ASN1_TIME* epoch = ASN1_TIME_new();
+  ASN1_TIME_set_string(epoch, "700101000000Z");
+
+  int days, seconds;
+  ASN1_TIME_diff(&days, &seconds, epoch, notafter);
+
+  ASN1_TIME_free(epoch);
+
+  return (days * 24 * 60 * 60) + seconds;
+}
+
+static int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
+  SSL* ssl =
+      X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+
+  X509* x509 = X509_STORE_CTX_get0_cert(ctx);
+  client_cert_t* cert = (client_cert_t*)SSL_get_ex_data(ssl, client_cert_index);
+
+  if (cert != NULL && !cert->initialized) {
+    LOG_DEBUG("Reading the provided client certificate...");
+
+    // set this flag so that we don't perform this logic multiple times (leading
+    // to memory leaks when re-allocating the fingerprint needlessly)
+    //
+    // i tried to work around this with SSL_VERIFY_CLIENT_ONCE and depth=0, but
+    // apparently OpenSSL has other plans and it isn't telling me what they are;
+    // so we have to do this
+    cert->initialized = true;
+
+    size_t pubkey_len = 0;
+    hash_buffer_t hash;
+    unsigned char* pubkey = get_pubkey_from_x509(x509, &pubkey_len);
+
+    size_t hash_len = compute_sha256_hash(&hash, pubkey, pubkey_len);
+    free(pubkey);
+
+    // allocate space for each hash byte to be illustrated as 2 characters, plus
+    // a null terminator
+    const size_t fingerprint_len = hash_len * 2;
+    cert->fingerprint = malloc((fingerprint_len + 1) * sizeof(char));
+    if (cert->fingerprint == NULL) {
+      LOG_ERROR("Failed to allocate space for certificate fingerprint");
+      return 0;
+    }
+
+    for (int i = 0; i < hash_len; ++i) {
+      snprintf(&cert->fingerprint[i], 2, "%02x", hash.data[i]);
+    }
+
+    cert->fingerprint[fingerprint_len] = '\0';
+    cert->not_after = get_x509_expiration(x509);
+  } else {
+    LOG_DEBUG(
+        "Client certificate was already read for this request; skipping...");
+  }
+
+  return 1;
+}
+
+static void init_openssl(void) {}
 
 SSL_CTX* init_ssl_context(void) {
   const SSL_METHOD* method = TLS_server_method();
@@ -79,6 +184,10 @@ SSL_CTX* init_ssl_context(void) {
     ERR_print_errors_fp(stderr);
     return NULL;
   }
+
+  SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
+                     handle_client_certificate);
+  SSL_CTX_set_verify_depth(ctx, 0);
 
   return ctx;
 }
@@ -104,9 +213,13 @@ static int set_certs(SSL_CTX* ctx, const char* cert_path,
 
 static void cleanup_ssl(SSL_CTX* ctx) {
   if (ctx != NULL) {
+    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_SSL, client_cert_index);
     SSL_CTX_free(ctx);
   }
 
+  FIPS_mode_set(0);
+  CRYPTO_cleanup_all_ex_data();
+  ERR_free_strings();
   EVP_cleanup();
 }
 
@@ -393,6 +506,9 @@ static void handle_success_response(SSL* ssl, response_t* response,
       char* tags = build_tags(response);
       char* header =
           build_response_header(STATUS_SUCCESS, tags, &header_length);
+
+      free(tags);
+
       if (header == NULL) {
         LOG_ERROR("Failed to allocate memory for the response header");
         send_status_response(ssl, STATUS_TEMPORARY_FAILURE, ERROR_MSG);
@@ -450,7 +566,12 @@ static void send_body_response(SSL* ssl, size_t path_length,
                                const char* const path,
                                request_callback_t callback,
                                const char* const input) {
-  request_t request = {path_length, path, input};
+  client_cert_t* cert = (client_cert_t*)SSL_get_ex_data(ssl, client_cert_index);
+  if (cert != NULL && cert->fingerprint != NULL) {
+    LOG_DEBUG("Client cert fingerprint: %s", cert->fingerprint);
+  }
+
+  request_t request = {path_length, cert, path, input};
   response_t response = {0, NULL, NULL, NULL, false};
 
   response_body_builder_t builder;
@@ -470,6 +591,7 @@ static void send_body_response(SSL* ssl, size_t path_length,
       break;
   }
 
+  destroy_client_cert(cert);
   free_response_fields(&response);
 }
 
@@ -479,6 +601,19 @@ void init_body_builder(response_body_builder_t* builder,
   builder->build_body = body_cb;
   builder->cleanup = cleanup;
   builder->data = data;
+}
+
+static client_cert_t* create_client_cert() {
+  client_cert_t* cert = malloc(sizeof(client_cert_t));
+  if (cert == NULL) {
+    LOG_ERROR("Failed to allocate memory for client cert object");
+  }
+
+  cert->fingerprint = NULL;
+  cert->not_after = 0;
+  cert->initialized = false;
+
+  return cert;
 }
 
 void handle_requests(net_t* net, request_callback_t callback) {
@@ -502,6 +637,10 @@ void handle_requests(net_t* net, request_callback_t callback) {
 
     SSL* ssl = SSL_new(net->ssl_ctx);
     SSL_set_fd(ssl, client);
+
+    LOG("Index: %d", client_cert_index);
+    SSL_set_ex_data(ssl, client_cert_index, create_client_cert());
+
     if (SSL_accept(ssl) <= 0) {
       ERR_print_errors_fp(stderr);
     } else {

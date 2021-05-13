@@ -9,7 +9,14 @@ typedef struct ssl_ctx_st SSL_CTX;
 typedef enum { OK, ERROR } callback_result_t;
 
 typedef struct {
+  char* fingerprint;
+  unsigned long not_after;
+  bool initialized;
+} client_cert_t;
+
+typedef struct {
   size_t path_length;
+  client_cert_t* cert;
   const char* path;
   const char* input;
 } request_t;
