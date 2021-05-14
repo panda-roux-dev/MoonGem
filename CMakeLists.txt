@@ -20,6 +20,7 @@ set(SRC_FILES
   "${MOONGEM_SRC_DIR}/api.c"
   "${MOONGEM_SRC_DIR}/parse.c"
   "${MOONGEM_SRC_DIR}/net.c"
+  "${MOONGEM_SRC_DIR}/header.c"
   "${MOONGEM_SRC_DIR}/util.c")
 
 set(CMAKE_C_FLAGS_DEBUG

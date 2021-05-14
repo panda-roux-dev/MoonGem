@@ -212,4 +212,3 @@ void response_static_file_cleanup_cb(void* data) {
     fclose((FILE*)data);
   }
 }
-

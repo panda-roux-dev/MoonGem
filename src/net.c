@@ -4,29 +4,22 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <signal.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "hashdef.h"
+#include "header.h"
 #include "log.h"
 #include "status.h"
 
 #define CREATE_SOCKET_FAILURE INT_MIN
 #define SET_CERTS_FAILURE INT_MIN
-#define EXTRACT_PATH_FAILURE INT_MIN
 
-#define MAX_URL_LENGTH 1024
-#define MAX_META_LENGTH 1024
 #define RESPONSE_BODY_BUFFER_LENGTH 4096
-#define HEADER_BUFFER_LENGTH 1029  // code(2) + space(1) + meta(1024) + \r\n
 
 #define ERROR_MSG "Server error"
 
-#define URL_SCHEME "gemini://"
-#define URL_TERMINATOR "\r\n"
-#define URL_INPUT_DELIMITER '?'
-#define URL_PATH_DELIMITER '/'
+DEFINE_SHA_OFSIZE(256)
 
 static volatile sig_atomic_t terminate = 0;
 static volatile sig_atomic_t stop = 0;
@@ -35,10 +28,6 @@ static int client_cert_index = 0;
 
 static const int OPT_OFF = 0;
 static const int OPT_ON = 1;
-
-typedef struct {
-  unsigned char data[EVP_MAX_MD_SIZE];
-} hash_buffer_t;
 
 static int create_socket(int port) {
   struct sockaddr_in6 addr;
@@ -96,22 +85,6 @@ static unsigned char* get_pubkey_from_x509(X509* certificate, size_t* len) {
   return pubkey;
 }
 
-static size_t compute_sha256_hash(hash_buffer_t* buf, unsigned char* msg,
-                                  size_t msg_len) {
-  const EVP_MD* digest = EVP_sha256();
-
-  EVP_MD_CTX* digest_ctx = EVP_MD_CTX_new();
-
-  unsigned int hash_len;
-  EVP_DigestInit(digest_ctx, digest);
-  EVP_DigestUpdate(digest_ctx, msg, msg_len);
-  EVP_DigestFinal_ex(digest_ctx, &buf->data[0], &hash_len);
-
-  EVP_MD_CTX_free(digest_ctx);
-
-  return hash_len;
-}
-
 static unsigned int get_x509_expiration(X509* certificate) {
   ASN1_TIME* notafter = X509_get_notAfter(certificate);
   ASN1_TIME* epoch = ASN1_TIME_new();
@@ -144,9 +117,8 @@ static int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
     cert->initialized = true;
 
     size_t pubkey_len = 0;
-    hash_buffer_t hash;
+    hash_buffer_256_t hash;
     unsigned char* pubkey = get_pubkey_from_x509(x509, &pubkey_len);
-
     size_t hash_len = compute_sha256_hash(&hash, pubkey, pubkey_len);
     free(pubkey);
 
@@ -267,144 +239,6 @@ static void wait_until_continue(void) {
       exit(EXIT_FAILURE);
     }
   }
-}
-
-static char* extract_input(char* request) {
-  char* term = strstr(request, URL_TERMINATOR);
-  if (term == NULL) {
-    return NULL;
-  }
-
-  char* input_delim = memchr(request, URL_INPUT_DELIMITER, term - request);
-  if (input_delim == NULL) {
-    return NULL;
-  }
-
-  ++input_delim;  // skip delimiter
-
-  size_t input_len = term - input_delim;
-  char* input = malloc((input_len + 1) * sizeof(char));
-  memcpy(input, input_delim, input_len * sizeof(char));
-  input[input_len] = '\0';
-
-  return input;
-}
-
-static int extract_path(char* request, char* buffer, size_t* length) {
-  // first check that the request body begins with the URL scheme
-  if (strstr(request, URL_SCHEME) != request) {
-    return EXTRACT_PATH_FAILURE;
-  }
-
-  // host starts after the scheme
-  char* host_begin = &request[sizeof(URL_SCHEME) / sizeof(char)];
-
-  // ensure that there's a \r\n terminating the request
-  char* term = strstr(request, URL_TERMINATOR);
-  if (term == NULL || term == host_begin) {
-    return EXTRACT_PATH_FAILURE;
-  }
-
-  // check for input after the path
-  char* input_delim =
-      memchr(host_begin, URL_INPUT_DELIMITER, term - host_begin);
-
-  // path (if one exists) is everything between the first forward-slash after
-  // the host and either the "?" input delimiter or the \r\n terminator
-
-  char* path = memchr(host_begin, '/', term - host_begin);
-
-  size_t len = input_delim == NULL || input_delim > term ? term - path
-                                                         : input_delim - path;
-
-  // check if a path exists; if so, copy it into the buffer.
-  //
-  // otherwise, set length to zero and set up the buffer as an empty string
-
-  if (path != NULL) {
-    memcpy(buffer, path, len);
-    buffer[len] = '\0';
-  } else {
-    len = 0;
-    buffer[0] = '\0';
-  }
-
-  *length = len;
-  return 0;
-}
-
-static char* build_tags(response_t* response) {
-  char* buffer = malloc(MAX_META_LENGTH * sizeof(char));
-  memset(buffer, '\0', MAX_META_LENGTH);
-
-  if (buffer == NULL) {
-    LOG_ERROR("Failed to allocate response header tags buffer");
-    return NULL;
-  }
-
-  int tags_written = 0;
-  int offset = 0;
-  if (response->meta != NULL) {
-    offset += snprintf(buffer, MAX_META_LENGTH, "%s", response->meta);
-    ++tags_written;
-  }
-
-  if (response->mimetype != NULL) {
-    if (tags_written > 0) {
-      offset += snprintf(buffer, MAX_META_LENGTH - offset, "; %s",
-                         response->mimetype);
-    } else {
-      offset += snprintf(buffer, MAX_META_LENGTH, "%s", response->mimetype);
-    }
-    ++tags_written;
-  }
-
-  if (response->language != NULL) {
-    if (tags_written > 0) {
-      snprintf(buffer, MAX_META_LENGTH - offset, "; lang=%s",
-               response->language);
-    } else {
-      snprintf(buffer, MAX_META_LENGTH, "lang=%s", response->language);
-    }
-  }
-
-  return buffer;
-}
-
-static char* build_response_header(int status, char* meta, size_t* length) {
-  // set up an initial buffer with enough space to store the header
-  char header[HEADER_BUFFER_LENGTH];
-  memset(&header[0], '\0', HEADER_BUFFER_LENGTH);
-
-  // check size of the meta field, if it's set;
-  //
-  // - if meta is set, then validate its length and write it into the header
-  // - otherwise if meta is not set, write a header without it
-  size_t header_len = 0;
-  if (meta != NULL) {
-    header_len =
-        snprintf(&header[0], HEADER_BUFFER_LENGTH, "%d %s\r\n", status, meta);
-  } else {
-    header_len = snprintf(&header[0], HEADER_BUFFER_LENGTH, "%d\r\n", status);
-  }
-
-  if (header_len >= HEADER_BUFFER_LENGTH || header_len <= 0) {
-    LOG_ERROR("Failed to generate a response header");
-    return NULL;
-  }
-
-  LOG_DEBUG("Generated a response header of length %zu", header_len);
-  *length = header_len;
-
-  // return a copy of the header in a heap-allocated buffer
-  char* copy = strndup(&header[0], header_len);
-  if (copy == NULL) {
-    LOG_ERROR("Failed to allocate header buffer");
-  }
-
-  LOG_DEBUG("Response header: %s", header);
-
-  return copy;
 }
 
 net_t* init_socket(int port, const char* cert_path, const char* key_path) {
@@ -620,6 +454,7 @@ void handle_requests(net_t* net, request_callback_t callback) {
   char request_buffer[MAX_URL_LENGTH + 2];  // + 2 for CR + LF
 
   LOG_DEBUG("Request buffer is %zu bytes in length",
+
             sizeof(request_buffer) / sizeof(char));
 
   LOG_DEBUG("Listening for requests...");
@@ -637,8 +472,6 @@ void handle_requests(net_t* net, request_callback_t callback) {
 
     SSL* ssl = SSL_new(net->ssl_ctx);
     SSL_set_fd(ssl, client);
-
-    LOG("Index: %d", client_cert_index);
     SSL_set_ex_data(ssl, client_cert_index, create_client_cert());
 
     if (SSL_accept(ssl) <= 0) {
@@ -656,8 +489,7 @@ void handle_requests(net_t* net, request_callback_t callback) {
             "Failed to allocate enough memory for the incoming request path");
         send_status_response(ssl, STATUS_TEMPORARY_FAILURE, ERROR_MSG);
       } else {
-        if (extract_path(&request_buffer[0], path, &path_length) ==
-            EXTRACT_PATH_FAILURE) {
+        if (extract_path(&request_buffer[0], path, &path_length) != 0) {
           LOG_DEBUG(
               "Client sent an invalid request.  No path could be inferred.");
 

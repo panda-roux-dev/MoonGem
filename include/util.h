@@ -8,6 +8,11 @@
 
 #include "net.h"
 
+#define DEFINE_HASH_BUFFER(name, size) \
+  typedef struct {                     \
+    unsigned char data[size];          \
+  } name;
+
 #define BUFFER_APPEND_FAILURE INT_MIN
 
 typedef struct {
