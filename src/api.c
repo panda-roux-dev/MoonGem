@@ -90,7 +90,7 @@ int api_head_get_cert(lua_State* L) {
   request_t* request = (request_t*)lua_touserdata(L, -1);
 
   client_cert_t* cert = request->cert;
-  if (cert == NULL) {
+  if (!cert->initialized) {
     // no cert provided; request one from the client
     lua_getglobal(L, TBL_RESPONSE);
     lua_getfield(L, -1, FLD_RESPONSE_PTR);
@@ -125,15 +125,9 @@ int api_head_has_cert(lua_State* L) {
   lua_getfield(L, -1, FLD_REQUEST_PTR);
   request_t* request = (request_t*)lua_touserdata(L, -1);
 
-  if (request == NULL) {
-    LOG("Request is NULL!");
-    return 0;
-  } else {
-    int exists = request->cert == NULL ? 0 : 1;
-    lua_pushboolean(L, exists);
+  lua_pushboolean(L, request->cert->initialized);
 
-    return 1;
-  }
+  return 1;
 }
 
 int api_body_include(lua_State* L) {
