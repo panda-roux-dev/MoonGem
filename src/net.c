@@ -70,19 +70,20 @@ static void destroy_client_cert(client_cert_t* cert) {
   }
 }
 
-static unsigned char* get_pubkey_from_x509(X509* certificate, size_t* len) {
+static unsigned char* get_modulus_from_x509(X509* certificate, size_t* len) {
   EVP_PKEY* key = X509_get_pubkey(certificate);
 
-  // get key size
-  EVP_PKEY_get_raw_public_key(key, NULL, len);
+  struct rsa_st* rsa = EVP_PKEY_get1_RSA(key);
+  const BIGNUM* modulus = RSA_get0_n(rsa);
 
   // store key contents in a buffer
-  unsigned char* pubkey = malloc(sizeof(unsigned char) * (*len));
-  EVP_PKEY_get_raw_public_key(key, pubkey, len);
+  *len = BN_num_bytes(modulus);
+  unsigned char* buffer = malloc(sizeof(unsigned char) * (*len));
+  BN_bn2bin(modulus, buffer);
 
   EVP_PKEY_free(key);
 
-  return pubkey;
+  return buffer;
 }
 
 static unsigned int get_x509_expiration(X509* certificate) {
@@ -118,9 +119,9 @@ static int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
 
     size_t pubkey_len = 0;
     hash_buffer_256_t hash;
-    unsigned char* pubkey = get_pubkey_from_x509(x509, &pubkey_len);
-    size_t hash_len = compute_sha256_hash(&hash, pubkey, pubkey_len);
-    free(pubkey);
+    unsigned char* modulus = get_modulus_from_x509(x509, &pubkey_len);
+    size_t hash_len = compute_sha256_hash(&hash, modulus, pubkey_len);
+    free(modulus);
 
     // allocate space for each hash byte to be illustrated as 2 characters, plus
     // a null terminator
