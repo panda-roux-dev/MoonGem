@@ -20,6 +20,19 @@
 #define SPACE " "
 #define NEWLINE "\n"
 
+#define DEFAULT_MSG_INPUT_REQUIRED "Input required"
+#define DEFAULT_MSG_CERT_REQUIRED "Client certificate required"
+
+#define FLD_CERT_FINGERPRINT "fingerprint"
+#define FLD_CERT_EXPIRATION "not_after"
+
+static void set_interrupt_response(response_t* response, int status,
+                                   const char* meta) {
+  response->interrupted = true;
+  response->meta = strdup(meta);
+  response->status = status;
+}
+
 int api_head_set_lang(lua_State* L) {
   const char* lang = luaL_checkstring(L, 2);
 
@@ -44,10 +57,13 @@ int api_head_get_input(lua_State* L) {
     lua_getfield(L, -1, FLD_RESPONSE_PTR);
     response_t* response = (response_t*)lua_touserdata(L, -1);
 
-    const char* prompt = luaL_checkstring(L, 2);
-    response->meta = strdup(prompt);
-    response->status = STATUS_INPUT;
-    response->interrupted = true;
+    if (lua_isnoneornil(L, 2)) {
+      set_interrupt_response(response, STATUS_INPUT,
+                             DEFAULT_MSG_INPUT_REQUIRED);
+    } else {
+      const char* prompt = luaL_checkstring(L, 2);
+      set_interrupt_response(response, STATUS_INPUT, prompt);
+    }
 
     return 0;
   }
@@ -62,11 +78,6 @@ int api_head_get_input_sensitive(lua_State* L) {
     lua_getfield(L, -1, FLD_RESPONSE_PTR);
     response_t* response = (response_t*)lua_touserdata(L, -1);
 
-    const char* prompt = luaL_checkstring(L, 2);
-    response->meta = strdup(prompt);
-    response->status = STATUS_SENSITIVE_INPUT;
-    response->interrupted = true;
-
     return 0;
   }
 
@@ -74,9 +85,55 @@ int api_head_get_input_sensitive(lua_State* L) {
 }
 
 int api_head_get_cert(lua_State* L) {
-  // TODO
+  lua_getglobal(L, TBL_REQUEST);
+  lua_getfield(L, -1, FLD_REQUEST_PTR);
+  request_t* request = (request_t*)lua_touserdata(L, -1);
+
+  client_cert_t* cert = request->cert;
+  if (cert == NULL) {
+    // no cert provided; request one from the client
+    lua_getglobal(L, TBL_RESPONSE);
+    lua_getfield(L, -1, FLD_RESPONSE_PTR);
+    response_t* response = (response_t*)lua_touserdata(L, -1);
+
+    if (lua_isnoneornil(L, 2)) {
+      set_interrupt_response(response, STATUS_CLIENT_CERTIFICATE_REQUIRED,
+                             DEFAULT_MSG_CERT_REQUIRED);
+    } else {
+      const char* prompt = luaL_checkstring(L, 2);
+      set_interrupt_response(response, STATUS_CLIENT_CERTIFICATE_REQUIRED,
+                             prompt);
+    }
+
+    return 0;
+  }
+
+  // return a new table { fingerprint, not_after }
+  lua_newtable(L);
+
+  lua_pushstring(L, cert->fingerprint);
+  lua_setfield(L, -2, FLD_CERT_FINGERPRINT);
+
+  lua_pushinteger(L, cert->not_after);
+  lua_setfield(L, -2, FLD_CERT_EXPIRATION);
 
   return 1;
+}
+
+int api_head_has_cert(lua_State* L) {
+  lua_getglobal(L, TBL_REQUEST);
+  lua_getfield(L, -1, FLD_REQUEST_PTR);
+  request_t* request = (request_t*)lua_touserdata(L, -1);
+
+  if (request == NULL) {
+    LOG("Request is NULL!");
+    return 0;
+  } else {
+    int exists = request->cert == NULL ? 0 : 1;
+    lua_pushboolean(L, exists);
+
+    return 1;
+  }
 }
 
 int api_body_include(lua_State* L) {

@@ -8,8 +8,11 @@
 #define FLD_INPUT "_INPUT"
 
 #define TBL_RESPONSE "_RESPONSE"
-#define FLD_BUFFER "buffer"
 #define FLD_RESPONSE_PTR "ptr"
+#define FLD_BUFFER "buffer"
+
+#define TBL_REQUEST "_REQUEST"
+#define FLD_REQUEST_PTR "ptr"
 
 #define RUN_SCRIPT_FAILURE INT_MIN
 

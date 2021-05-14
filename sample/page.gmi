@@ -1,6 +1,12 @@
 -<<
 BODY:include("header.gmi")
 
+if HEAD:has_cert() then
+  local cert = HEAD:get_cert()
+  BODY:line(string.format("Your certificate's fingerprint: %s", cert.fingerprint))
+  BODY:line(string.format("Your certificate expires on %s", os.date("%c", cert.not_after)))
+end
+
 for i = 1, 10 do
   BODY:write(tostring(i).." ")
 end

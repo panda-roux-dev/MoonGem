@@ -53,50 +53,41 @@ MoonGem exposes the following Lua functions for generating content:
 `BODY:include(<path>)`
 Inserts the contents of the file at <path>. Note that this DOES NOT run embedded scripts in the source document if a Gemtext file is specified. This is an intentional choice for the sake of simplicity.
 
----
-
 `BODY:write(<text>)`
 Writes <text> to the body of the document. No new-line character is appended.
-
----
 
 `BODY:line(<text>)`
 Writes <text> to the body of the document, followed by a new-line character.
 
----
-
 `BODY:link(<url>, [text])`
 Writes a link pointing to <url> to the body of the document. Optionally, [text] can be specified in order to append link alt-text.
-
----
 
 `BODY:heading(<text>, <level>)`
 Writes <text> as a heading line to the body of the document. The value of <level> indicates the heading level (in other words, <level> == number of #'s).
 
----
-
 `BODY:block(<text>)`
 Writes <text> in a preformatted block.
-
----
 
 `BODY:begin_block([alt-text])`
 Writes the beginning of a preformatted block with optional [alt-text].
 
----
-
 `BODY:end_block()`
 Writes the end of a preformatted block.
-
----
 
 `HEAD:set_lang(<language>)`
 Sets the language tag in the response header.
 
----
-
 `HEAD:get_input([prompt]), HEAD:get_sensitive_input([prompt])`
 Prompts the client for input and returns the result.
+
+`HEAD:has_cert()`
+Returns `true` if the client provided a certificate on this request; otherwise, `false`.
+
+`HEAD:get_cert()`
+Returns a table with the following structure fields (or nil if no cert is present):
+- `fingerprint`: a string representation of a SHA256 hash of the client certificate's public key
+- `not_after`: the certificate's expiration time, in seconds since the UNIX epoch
+
 
 ## Source
 

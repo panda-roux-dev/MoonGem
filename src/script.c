@@ -14,7 +14,8 @@
 #define FUNC_LANG "set_lang"
 #define FUNC_INPUT "get_input"
 #define FUNC_INPUT_SENSITIVE "get_sensitive_input"
-#define FUNC_CERT "get_certificate"
+#define FUNC_CERT "get_cert"
+#define FUNC_CHECKCERT "has_cert"
 
 #define TBL_BODY "BODY"
 #define FUNC_INCLUDE "include"
@@ -37,6 +38,8 @@ int api_head_get_input(lua_State* L);
 int api_head_get_input_sensitive(lua_State* L);
 
 int api_head_get_cert(lua_State* L);
+
+int api_head_has_cert(lua_State* L);
 
 int api_body_include(lua_State* L);
 
@@ -110,14 +113,20 @@ static void add_header_api_methods(lua_State* L) {
   lua_pushcfunction(L, api_head_get_cert);
   lua_setfield(L, -2, FUNC_CERT);
 
+  lua_pushcfunction(L, api_head_has_cert);
+  lua_setfield(L, -2, FUNC_CHECKCERT);
+
   lua_setglobal(L, TBL_HEADER);
 }
 
-static void add_response_ptr(lua_State* L, response_t* response) {
-  lua_getglobal(L, TBL_RESPONSE);
+static void add_response_ptr(lua_State* L, int index, response_t* response) {
   lua_pushlightuserdata(L, response);
-  lua_setfield(L, -2, FLD_RESPONSE_PTR);
-  lua_pop(L, lua_gettop(L));
+  lua_setfield(L, index - 1, FLD_RESPONSE_PTR);
+}
+
+static void add_request_ptr(lua_State* L, int index, const request_t* request) {
+  lua_pushlightuserdata(L, (request_t*)request);
+  lua_setfield(L, index - 1, FLD_REQUEST_PTR);
 }
 
 static void init_scripting_api(lua_State* L, const request_t* request,
@@ -126,7 +135,13 @@ static void init_scripting_api(lua_State* L, const request_t* request,
 
   // add global response table
   lua_newtable(L);
+  add_response_ptr(L, -1, response);
   lua_setglobal(L, TBL_RESPONSE);
+
+  // add global request table
+  lua_newtable(L);
+  add_request_ptr(L, -1, request);
+  lua_setglobal(L, TBL_REQUEST);
 
   // set the PATH global variable
   lua_pushstring(L, request->path + 1);
@@ -140,7 +155,6 @@ static void init_scripting_api(lua_State* L, const request_t* request,
 
   add_body_api_methods(L);
   add_header_api_methods(L);
-  add_response_ptr(L, response);
 }
 
 static void init_response_buffer(lua_State* L) {

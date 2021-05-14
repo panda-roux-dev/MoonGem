@@ -5,3 +5,4 @@ compile_commands.json
 *.key
 *.pem
 .cache/
+vgcore.*
