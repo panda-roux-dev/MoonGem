@@ -83,8 +83,8 @@ Prompts the client for input and returns the result.
 `HEAD:has_cert()`
 Returns `true` if the client provided a certificate on this request; otherwise, `false`.
 
-`HEAD:get_cert()`
-Returns a table with the following structure fields (or nil if no cert is present):
+`HEAD:get_cert([prompt])`
+If no client certificate was sent along with the current request, sends a code-60 status response to the client along with the optioal prompt, and returns `nil`.  The client should then repeat the request with a valid certificate.  Otherwise, if a certificate is present, returns a table with the following structure fields:
 - `fingerprint`: a string representation of a SHA256 hash of the client certificate's public key
 - `not_after`: the certificate's expiration time, in seconds since the UNIX epoch
 
