@@ -81,6 +81,7 @@ static unsigned char* get_modulus_from_x509(X509* certificate, size_t* len) {
   unsigned char* buffer = malloc(sizeof(unsigned char) * (*len));
   BN_bn2bin(modulus, buffer);
 
+  RSA_free(rsa);
   EVP_PKEY_free(key);
 
   return buffer;
