@@ -4,6 +4,8 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <signal.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -19,12 +21,8 @@
 
 #define ERROR_MSG "Server error"
 
-DEFINE_SHA_OFSIZE(256)
-
 static volatile sig_atomic_t terminate = 0;
 static volatile sig_atomic_t stop = 0;
-
-static int client_cert_index = 0;
 
 static const int OPT_OFF = 0;
 static const int OPT_ON = 1;
@@ -58,93 +56,6 @@ static int create_socket(int port) {
   }
 
   return sock;
-}
-
-static void destroy_client_cert(client_cert_t* cert) {
-  if (cert != NULL) {
-    if (cert->fingerprint != NULL) {
-      free(cert->fingerprint);
-    }
-
-    free(cert);
-  }
-}
-
-static unsigned char* get_modulus_from_x509(X509* certificate, size_t* len) {
-  EVP_PKEY* key = X509_get_pubkey(certificate);
-
-  struct rsa_st* rsa = EVP_PKEY_get1_RSA(key);
-  const BIGNUM* modulus = RSA_get0_n(rsa);
-
-  // store key contents in a buffer
-  *len = BN_num_bytes(modulus);
-  unsigned char* buffer = malloc(sizeof(unsigned char) * (*len));
-  BN_bn2bin(modulus, buffer);
-
-  RSA_free(rsa);
-  EVP_PKEY_free(key);
-
-  return buffer;
-}
-
-static unsigned int get_x509_expiration(X509* certificate) {
-  ASN1_TIME* notafter = X509_get_notAfter(certificate);
-  ASN1_TIME* epoch = ASN1_TIME_new();
-  ASN1_TIME_set_string(epoch, "700101000000Z");
-
-  int days, seconds;
-  ASN1_TIME_diff(&days, &seconds, epoch, notafter);
-
-  ASN1_TIME_free(epoch);
-
-  return (days * 24 * 60 * 60) + seconds;
-}
-
-static int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
-  SSL* ssl =
-      X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
-
-  X509* x509 = X509_STORE_CTX_get0_cert(ctx);
-  client_cert_t* cert = (client_cert_t*)SSL_get_ex_data(ssl, client_cert_index);
-
-  if (cert != NULL && !cert->initialized) {
-    LOG_DEBUG("Reading the provided client certificate...");
-
-    // set this flag so that we don't perform this logic multiple times (leading
-    // to memory leaks when re-allocating the fingerprint needlessly)
-    //
-    // i tried to work around this with SSL_VERIFY_CLIENT_ONCE and depth=0, but
-    // apparently OpenSSL has other plans and it isn't telling me what they are;
-    // so we have to do this
-    cert->initialized = true;
-
-    size_t pubkey_len = 0;
-    hash_buffer_256_t hash;
-    unsigned char* modulus = get_modulus_from_x509(x509, &pubkey_len);
-    size_t hash_len = compute_sha256_hash(&hash, modulus, pubkey_len);
-    free(modulus);
-
-    // allocate space for each hash byte to be illustrated as 2 characters, plus
-    // a null terminator
-    const size_t fingerprint_len = hash_len * 2;
-    cert->fingerprint = malloc((fingerprint_len + 1) * sizeof(char));
-    if (cert->fingerprint == NULL) {
-      LOG_ERROR("Failed to allocate space for certificate fingerprint");
-      return 0;
-    }
-
-    for (int i = 0; i < hash_len; ++i) {
-      snprintf(&cert->fingerprint[i], 2, "%02x", hash.data[i]);
-    }
-
-    cert->fingerprint[fingerprint_len] = '\0';
-    cert->not_after = get_x509_expiration(x509);
-  } else {
-    LOG_DEBUG(
-        "Client certificate was already read for this request; skipping...");
-  }
-
-  return 1;
 }
 
 static void init_openssl(void) {}
@@ -187,7 +98,7 @@ static int set_certs(SSL_CTX* ctx, const char* cert_path,
 
 static void cleanup_ssl(SSL_CTX* ctx) {
   if (ctx != NULL) {
-    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_SSL, client_cert_index);
+    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_SSL, get_client_cert_index());
     SSL_CTX_free(ctx);
   }
 
@@ -402,7 +313,8 @@ static void send_body_response(SSL* ssl, size_t path_length,
                                const char* const path,
                                request_callback_t callback,
                                const char* const input) {
-  client_cert_t* cert = (client_cert_t*)SSL_get_ex_data(ssl, client_cert_index);
+  client_cert_t* cert =
+      (client_cert_t*)SSL_get_ex_data(ssl, get_client_cert_index());
   if (cert != NULL && cert->fingerprint != NULL) {
     LOG_DEBUG("Client cert fingerprint: %s", cert->fingerprint);
   }
@@ -474,7 +386,7 @@ void handle_requests(net_t* net, request_callback_t callback) {
 
     SSL* ssl = SSL_new(net->ssl_ctx);
     SSL_set_fd(ssl, client);
-    SSL_set_ex_data(ssl, client_cert_index, create_client_cert());
+    SSL_set_ex_data(ssl, get_client_cert_index(), create_client_cert());
 
     if (SSL_accept(ssl) <= 0) {
       ERR_print_errors_fp(stderr);
