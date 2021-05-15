@@ -60,61 +60,33 @@ int api_body_beginblock(lua_State* L);
 int api_body_endblock(lua_State* L);
 
 static void add_body_api_methods(lua_State* L) {
-  lua_newtable(L);
+  luaL_Reg methods[] = {{FUNC_INCLUDE, api_body_include},
+                        {FUNC_WRITE, api_body_write},
+                        {FUNC_LINE, api_body_line},
+                        {FUNC_LINK, api_body_link},
+                        {FUNC_HEADING, api_body_heading},
+                        {FUNC_QUOTE, api_body_quote},
+                        {FUNC_BLOCK, api_body_block},
+                        {FUNC_BEGIN_BLOCK, api_body_beginblock},
+                        {FUNC_END_BLOCK, api_body_endblock},
+                        {NULL, NULL}};
 
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_setfield(L, -2, TBL_RESPONSE);
-
-  lua_pushcfunction(L, api_body_include);
-  lua_setfield(L, -2, FUNC_INCLUDE);
-
-  lua_pushcfunction(L, api_body_include);
-  lua_setfield(L, -2, FUNC_INCLUDE);
-
-  lua_pushcfunction(L, api_body_write);
-  lua_setfield(L, -2, FUNC_WRITE);
-
-  lua_pushcfunction(L, api_body_line);
-  lua_setfield(L, -2, FUNC_LINE);
-
-  lua_pushcfunction(L, api_body_link);
-  lua_setfield(L, -2, FUNC_LINK);
-
-  lua_pushcfunction(L, api_body_heading);
-  lua_setfield(L, -2, FUNC_HEADING);
-
-  lua_pushcfunction(L, api_body_quote);
-  lua_setfield(L, -2, FUNC_QUOTE);
-
-  lua_pushcfunction(L, api_body_block);
-  lua_setfield(L, -2, FUNC_BLOCK);
-
-  lua_pushcfunction(L, api_body_beginblock);
-  lua_setfield(L, -2, FUNC_BEGIN_BLOCK);
-
-  lua_pushcfunction(L, api_body_endblock);
-  lua_setfield(L, -2, FUNC_END_BLOCK);
+  luaL_newlib(L, methods);
 
   lua_setglobal(L, TBL_BODY);
 }
 
 static void add_header_api_methods(lua_State* L) {
-  lua_newtable(L);
+  luaL_Reg methods[] = {
+      {FUNC_LANG, api_head_set_lang},
+      {FUNC_INPUT, api_head_get_input},
+      {FUNC_INPUT_SENSITIVE, api_head_get_input_sensitive},
+      {FUNC_CERT, api_head_get_cert},
+      {FUNC_CHECKCERT, api_head_has_cert},
+      {NULL, NULL},
+  };
 
-  lua_pushcfunction(L, api_head_set_lang);
-  lua_setfield(L, -2, FUNC_LANG);
-
-  lua_pushcfunction(L, api_head_get_input);
-  lua_setfield(L, -2, FUNC_INPUT);
-
-  lua_pushcfunction(L, api_head_get_input_sensitive);
-  lua_setfield(L, -2, FUNC_INPUT_SENSITIVE);
-
-  lua_pushcfunction(L, api_head_get_cert);
-  lua_setfield(L, -2, FUNC_CERT);
-
-  lua_pushcfunction(L, api_head_has_cert);
-  lua_setfield(L, -2, FUNC_CHECKCERT);
+  luaL_newlib(L, methods);
 
   lua_setglobal(L, TBL_HEADER);
 }
