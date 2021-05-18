@@ -108,15 +108,9 @@ static void cleanup_ssl(SSL_CTX* ctx) {
   EVP_cleanup();
 }
 
-static void sig_terminate_handler(int sig) {
-  LOG_DEBUG("Received signal %d; terminating...", sig);
-  terminate = 1;
-}
+static void sig_terminate_handler(int sig) { terminate = 1; }
 
-static void sig_stop_handler(int sig) {
-  LOG_DEBUG("Received SIGSTOP;  stopping...");
-  stop = 1;
-}
+static void sig_stop_handler(int sig) { stop = 1; }
 
 static void sig_kill_handler(int _) { exit(EXIT_FAILURE); }
 
@@ -130,8 +124,6 @@ static void set_signal_handler(net_t* net) {
 }
 
 static void wait_until_continue(void) {
-  LOG_DEBUG("Stopped.  Waiting for another signal...");
-
   sigset_t set;
   sigemptyset(&set);
   sigaddset(&set, SIGCONT);
@@ -141,8 +133,6 @@ static void wait_until_continue(void) {
 
   int sig;
   sigwait(&set, &sig);
-
-  LOG_DEBUG("Received signal %d.  Continuing...", sig);
 
   stop = 0;
   if (sig != SIGCONT) {
@@ -155,8 +145,6 @@ static void wait_until_continue(void) {
 }
 
 net_t* init_socket(int port, const char* cert_path, const char* key_path) {
-  LOG_DEBUG("Initializing network resources...");
-
   SSL_CTX* ctx;
   if ((ctx = init_ssl_context()) == NULL) {
     return NULL;
@@ -167,15 +155,11 @@ net_t* init_socket(int port, const char* cert_path, const char* key_path) {
     return NULL;
   }
 
-  LOG_DEBUG("Loaded certificate and key");
-
   int sock;
   if ((sock = create_socket(port)) == CREATE_SOCKET_FAILURE) {
     cleanup_ssl(ctx);
     return NULL;
   }
-
-  LOG_DEBUG("Created socket (%d)", sock);
 
   net_t* net = malloc(sizeof(net_t));
   net->socket = sock;
@@ -193,16 +177,13 @@ void destroy_socket(net_t* net) {
   cleanup_ssl(net->ssl_ctx);
 
   free(net);
-
-  LOG_DEBUG("Network resources destroyed");
 }
 
 static void send_status_response(SSL* ssl, int code, const char* meta) {
-  LOG_DEBUG("Sending response with status %d", code);
-
   size_t len;
   char* header = build_response_header(code, (char*)meta, &len);
   if (header != NULL) {
+    LOG("%d %s", code, meta);
     SSL_write(ssl, header, len);
     free(header);
   }
@@ -260,8 +241,12 @@ static void handle_success_response(SSL* ssl, response_t* response,
         return;
       }
 
+      size_t total_size = 0;
+
       SSL_write(ssl, header, header_length);
+
       SSL_write(ssl, &buffer[0], current_length);
+      total_size += current_length;
 
       // send the rest of the body
       for (;;) {
@@ -272,16 +257,18 @@ static void handle_success_response(SSL* ssl, response_t* response,
           break;
         }
 
-        LOG_DEBUG("Sending %zu bytes to the client", current_length);
         SSL_write(ssl, &buffer[0], current_length);
+        total_size += current_length;
       }
+
+      LOG("%zu header + %zu body bytes sent (total: %zu)", header_length,
+          total_size, total_size + header_length);
 
       free(header);
     } else if (response->interrupted) {
       // something in a script decided to end the response prematurely;
       // send a status header accordingly
 
-      LOG_DEBUG("Response interrupted");
       send_status_response(ssl, response->status, response->meta);
     }
   }
@@ -294,8 +281,6 @@ static void handle_success_response(SSL* ssl, response_t* response,
 
 static void handle_error_response(SSL* ssl, response_t* response) {
   if (response->status == 0) {
-    LOG_DEBUG("No error status code provided;  defaulting to %d",
-              STATUS_TEMPORARY_FAILURE);
     response->status = STATUS_TEMPORARY_FAILURE;
   }
 
@@ -314,7 +299,7 @@ static void send_body_response(SSL* ssl, size_t path_length,
   client_cert_t* cert =
       (client_cert_t*)SSL_get_ex_data(ssl, get_client_cert_index());
   if (cert != NULL && cert->fingerprint != NULL) {
-    LOG_DEBUG("Client cert fingerprint: %s", cert->fingerprint);
+    LOG("Fingerprint: %s", cert->fingerprint);
   }
 
   request_t request = {path_length, cert, path, input};
@@ -323,11 +308,9 @@ static void send_body_response(SSL* ssl, size_t path_length,
   response_body_builder_t builder;
   switch (callback(&request, &response, &builder)) {
     case OK:
-      LOG_DEBUG("Sending SUCCESS response");
       handle_success_response(ssl, &response, &builder);
       break;
     case ERROR:
-      LOG_DEBUG("Sending ERROR response");
       handle_error_response(ssl, &response);
       break;
     default:
@@ -396,11 +379,16 @@ void handle_requests(net_t* net, request_callback_t callback) {
             "Failed to allocate enough memory for the incoming request path");
         send_status_response(ssl, STATUS_TEMPORARY_FAILURE, ERROR_MSG);
       } else {
-        LOG("%s", &request_buffer[0]);
         if (extract_path(&request_buffer[0], path, &path_length) != 0) {
           send_status_response(ssl, STATUS_BAD_REQUEST, "Invalid URL");
         } else {
           char* input = extract_input(&request_buffer[0]);
+
+          if (input == NULL) {
+            LOG("%s", path);
+          } else {
+            LOG("%s?%s", path, input);
+          }
 
           send_body_response(ssl, path_length, path, callback, input);
 
