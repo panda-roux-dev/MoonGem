@@ -156,8 +156,6 @@ static void wait_until_continue(void) {
 net_t* init_socket(int port, const char* cert_path, const char* key_path) {
   LOG_DEBUG("Initializing network resources...");
 
-  init_openssl();
-
   SSL_CTX* ctx;
   if ((ctx = init_ssl_context()) == NULL) {
     return NULL;
