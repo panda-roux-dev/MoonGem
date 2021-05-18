@@ -58,8 +58,6 @@ static int create_socket(int port) {
   return sock;
 }
 
-static void init_openssl(void) {}
-
 SSL_CTX* init_ssl_context(void) {
   const SSL_METHOD* method = TLS_server_method();
 
@@ -70,6 +68,7 @@ SSL_CTX* init_ssl_context(void) {
     return NULL;
   }
 
+  SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
   SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
                      handle_client_certificate);
   SSL_CTX_set_verify_depth(ctx, 0);
