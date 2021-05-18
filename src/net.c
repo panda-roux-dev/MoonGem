@@ -372,7 +372,9 @@ void handle_requests(net_t* net, request_callback_t callback) {
     }
 
     int client;
-    if ((client = accept(net->socket, NULL, NULL)) < 0) {
+    struct sockaddr client_addr;
+    socklen_t addr_len = 0;
+    if ((client = accept(net->socket, &client_addr, &addr_len)) < 0) {
       LOG_ERROR("Failed to accept connection");
       return;
     }
@@ -394,6 +396,7 @@ void handle_requests(net_t* net, request_callback_t callback) {
             "Failed to allocate enough memory for the incoming request path");
         send_status_response(ssl, STATUS_TEMPORARY_FAILURE, ERROR_MSG);
       } else {
+        LOG("%s", &request_buffer[0]);
         if (extract_path(&request_buffer[0], path, &path_length) != 0) {
           send_status_response(ssl, STATUS_BAD_REQUEST, "Invalid URL");
         } else {
