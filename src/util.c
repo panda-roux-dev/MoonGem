@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "log.h"
+#include "net.h"
 
 #define BUFFER_DEFAULT_SIZE 1024
 #define FILE_BUFFER_SIZE 2048
@@ -117,8 +118,6 @@ void clear_buffer(text_buffer_t* buf) {
 }
 
 int check_privileges(void) {
-  LOG_DEBUG("Verifying that we aren't running as root...");
-
   if (getuid() == 0) {
     LOG_ERROR("MoonGem should not be run as root!  Terminating...");
     return 0;

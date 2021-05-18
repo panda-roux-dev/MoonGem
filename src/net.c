@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "cert.h"
 #include "hashdef.h"
 #include "header.h"
 #include "log.h"
@@ -58,7 +59,7 @@ static int create_socket(int port) {
   return sock;
 }
 
-SSL_CTX* init_ssl_context(void) {
+static SSL_CTX* init_ssl_context(void) {
   const SSL_METHOD* method = TLS_server_method();
 
   SSL_CTX* ctx;
@@ -352,6 +353,7 @@ static client_cert_t* create_client_cert() {
   client_cert_t* cert = malloc(sizeof(client_cert_t));
   if (cert == NULL) {
     LOG_ERROR("Failed to allocate memory for client cert object");
+    return NULL;
   }
 
   cert->fingerprint = NULL;
@@ -363,12 +365,6 @@ static client_cert_t* create_client_cert() {
 
 void handle_requests(net_t* net, request_callback_t callback) {
   char request_buffer[MAX_URL_LENGTH + 2];  // + 2 for CR + LF
-
-  LOG_DEBUG("Request buffer is %zu bytes in length",
-
-            sizeof(request_buffer) / sizeof(char));
-
-  LOG_DEBUG("Listening for requests...");
 
   while (!terminate) {
     if (stop) {
@@ -388,8 +384,6 @@ void handle_requests(net_t* net, request_callback_t callback) {
     if (SSL_accept(ssl) <= 0) {
       ERR_print_errors_fp(stderr);
     } else {
-      LOG_DEBUG("Request received");
-
       memset(&request_buffer[0], '\0', sizeof(request_buffer) / sizeof(char));
       SSL_read(ssl, &request_buffer[0], sizeof(request_buffer) / sizeof(char));
 
@@ -401,17 +395,9 @@ void handle_requests(net_t* net, request_callback_t callback) {
         send_status_response(ssl, STATUS_TEMPORARY_FAILURE, ERROR_MSG);
       } else {
         if (extract_path(&request_buffer[0], path, &path_length) != 0) {
-          LOG_DEBUG(
-              "Client sent an invalid request.  No path could be inferred.");
-
           send_status_response(ssl, STATUS_BAD_REQUEST, "Invalid URL");
         } else {
-          LOG_DEBUG("Requested path: %s", path);
-
           char* input = extract_input(&request_buffer[0]);
-          if (input != NULL) {
-            LOG_DEBUG("Received input: %s", input);
-          }
 
           send_body_response(ssl, path_length, path, callback, input);
 

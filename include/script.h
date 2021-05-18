@@ -1,7 +1,7 @@
 #ifndef SCRIPT_H
 #define SCRIPT_H
 
-#include "net.h"
+#include <stddef.h>
 
 #define FLD_PATH "PATH"
 
@@ -16,6 +16,9 @@
 
 #define RUN_SCRIPT_FAILURE INT_MIN
 
+struct request_t;
+struct response_t;
+
 typedef struct lua_State lua_State;
 
 typedef struct {
@@ -25,7 +28,8 @@ typedef struct {
   char* result;
 } script_ctx_t;
 
-script_ctx_t* init_script(const request_t* request, response_t* response);
+script_ctx_t* init_script(const struct request_t* request,
+                          struct response_t* response);
 
 void destroy_script(script_ctx_t* ctx);
 

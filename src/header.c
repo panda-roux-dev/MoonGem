@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "log.h"
+#include "net.h"
 
 #define MAX_META_LENGTH 1024
 #define HEADER_BUFFER_LENGTH 1029  // code(2) + space(1) + meta(1024) + \r\n
@@ -68,7 +69,6 @@ int extract_path(char* request, char* buffer, size_t* length) {
   // check if a path exists; if so, copy it into the buffer.
   //
   // otherwise, set length to zero and set up the buffer as an empty string
-
   if (path != NULL) {
     memcpy(buffer, path, len);
     buffer[len] = '\0';
@@ -90,6 +90,7 @@ char* build_tags(response_t* response) {
     return NULL;
   }
 
+  // write meta field
   int tags_written = 0;
   int offset = 0;
   if (response->meta != NULL) {
@@ -97,6 +98,7 @@ char* build_tags(response_t* response) {
     ++tags_written;
   }
 
+  // write mimetype
   if (response->mimetype != NULL) {
     if (tags_written > 0) {
       offset += snprintf(buffer, MAX_META_LENGTH - offset, "; %s",
@@ -107,6 +109,7 @@ char* build_tags(response_t* response) {
     ++tags_written;
   }
 
+  // write language
   if (response->language != NULL) {
     if (tags_written > 0) {
       snprintf(buffer, MAX_META_LENGTH - offset, "; lang=%s",
@@ -141,7 +144,6 @@ char* build_response_header(int status, char* meta, size_t* length) {
     return NULL;
   }
 
-  LOG_DEBUG("Generated a response header of length %zu", header_len);
   *length = header_len;
 
   // return a copy of the header in a heap-allocated buffer
@@ -149,8 +151,6 @@ char* build_response_header(int status, char* meta, size_t* length) {
   if (copy == NULL) {
     LOG_ERROR("Failed to allocate header buffer");
   }
-
-  LOG_DEBUG("Response header: %s", header);
 
   return copy;
 }

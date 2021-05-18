@@ -4,13 +4,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "cert.h"
-
 typedef struct ssl_ctx_st SSL_CTX;
+typedef struct client_cert_t client_cert_t;
 
-typedef enum { OK, ERROR } callback_result_t;
+typedef enum callback_result_t { OK, ERROR } callback_result_t;
 
-typedef struct {
+typedef struct request_t {
   size_t path_length;
   client_cert_t* cert;
   const char* path;
@@ -38,13 +37,13 @@ typedef void (*response_cleanup_callback_t)(void*);
  * Convenience object for containing response body build + cleanup callbacks,
  * and the opaque pointer to the data used by the builder implementation
  */
-typedef struct {
+typedef struct response_body_builder_t {
   void* data;
   response_body_callback_t build_body;
   response_cleanup_callback_t cleanup;
 } response_body_builder_t;
 
-typedef struct {
+typedef struct response_t {
   int status;
   char* meta;
   char* mimetype;
@@ -65,7 +64,7 @@ void init_body_builder(response_body_builder_t* builder,
                        response_body_callback_t body_cb,
                        response_cleanup_callback_t cleanup, void* data);
 
-typedef struct {
+typedef struct net_t {
   int socket;
   SSL_CTX* ssl_ctx;
 } net_t;
@@ -82,3 +81,4 @@ void destroy_socket(net_t* net);
 void handle_requests(net_t* net, request_callback_t callback);
 
 #endif
+

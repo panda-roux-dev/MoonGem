@@ -46,7 +46,8 @@ unsigned int get_x509_expiration(X509* certificate) {
   ASN1_TIME* epoch = ASN1_TIME_new();
   ASN1_TIME_set_string(epoch, "700101000000Z");
 
-  int days, seconds;
+  int days;
+  int seconds;
   ASN1_TIME_diff(&days, &seconds, epoch, notafter);
 
   ASN1_TIME_free(epoch);
@@ -62,8 +63,6 @@ int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
   client_cert_t* cert = (client_cert_t*)SSL_get_ex_data(ssl, client_cert_index);
 
   if (cert != NULL && !cert->initialized) {
-    LOG_DEBUG("Reading the provided client certificate...");
-
     // set this flag so that we don't perform this logic multiple times (leading
     // to memory leaks when re-allocating the fingerprint needlessly)
     //
@@ -93,9 +92,6 @@ int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
 
     cert->fingerprint[fingerprint_len] = '\0';
     cert->not_after = get_x509_expiration(x509);
-  } else {
-    LOG_DEBUG(
-        "Client certificate was already read for this request; skipping...");
   }
 
   return 1;

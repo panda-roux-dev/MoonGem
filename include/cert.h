@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef struct {
+typedef struct client_cert_t {
   char* fingerprint;
   unsigned long not_after;
   bool initialized;

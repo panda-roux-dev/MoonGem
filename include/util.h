@@ -5,9 +5,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "net.h"
-
 #define BUFFER_APPEND_FAILURE INT_MIN
+
+typedef struct request_t request_t;
 
 typedef struct {
   size_t length;

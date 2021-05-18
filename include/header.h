@@ -3,9 +3,9 @@
 
 #include <stddef.h>
 
-#include "net.h"
-
 #define MAX_URL_LENGTH 1024
+
+typedef struct response_t response_t;
 
 char* extract_input(char* request);
 

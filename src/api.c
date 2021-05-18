@@ -4,16 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cert.h"
 #include "log.h"
+#include "net.h"
 #include "script.h"
 #include "status.h"
 #include "util.h"
-
-#define SCRIPT_ERR(L, fmt, ...)             \
-  {                                         \
-    lua_pushfstring(L, fmt, ##__VA_ARGS__); \
-    lua_error(L);                           \
-  }
 
 #define LINK_TOKEN "=>"
 #define HEADER_TOKEN "#"
@@ -80,6 +76,14 @@ int api_head_get_input_sensitive(lua_State* L) {
     lua_getfield(L, -1, FLD_RESPONSE_PTR);
     response_t* response = (response_t*)lua_touserdata(L, -1);
 
+    if (lua_isnoneornil(L, 2)) {
+      set_interrupt_response(response, STATUS_SENSITIVE_INPUT,
+                             DEFAULT_MSG_INPUT_REQUIRED);
+    } else {
+      const char* prompt = luaL_checkstring(L, 2);
+      set_interrupt_response(response, STATUS_SENSITIVE_INPUT, prompt);
+    }
+
     return 0;
   }
 
@@ -138,7 +142,8 @@ int api_body_include(lua_State* L) {
   char* contents = NULL;
   size_t file_len = read_file(path, &contents);
   if (contents == NULL) {
-    SCRIPT_ERR(L, "Failed to read file at %s", path);
+    lua_pushfstring(L, "Failed to include file %s", path);
+    lua_error(L);
     return 0;
   }
 

@@ -4,6 +4,7 @@
 #ifndef MOONGEM_DISABLE_LOGGING
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
