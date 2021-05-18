@@ -183,7 +183,7 @@ static void send_status_response(SSL* ssl, int code, const char* meta) {
   size_t len;
   char* header = build_response_header(code, (char*)meta, &len);
   if (header != NULL) {
-    LOG("%d %s", code, meta);
+    LOG("*  %d %s", code, meta);
     SSL_write(ssl, header, len);
     free(header);
   }
@@ -261,7 +261,7 @@ static void handle_success_response(SSL* ssl, response_t* response,
         total_size += current_length;
       }
 
-      LOG("%zu header + %zu body bytes sent (total: %zu)", header_length,
+      LOG("*  %zu header + %zu body bytes sent (total: %zu)", header_length,
           total_size, total_size + header_length);
 
       free(header);
@@ -299,7 +299,7 @@ static void send_body_response(SSL* ssl, size_t path_length,
   client_cert_t* cert =
       (client_cert_t*)SSL_get_ex_data(ssl, get_client_cert_index());
   if (cert != NULL && cert->fingerprint != NULL) {
-    LOG("Fingerprint: %s", cert->fingerprint);
+    LOG("*  Fingerprint: %s", cert->fingerprint);
   }
 
   request_t request = {path_length, cert, path, input};
@@ -346,8 +346,37 @@ static client_cert_t* create_client_cert() {
   return cert;
 }
 
+static void log_remote_info(int sock) {
+  int port;
+  struct sockaddr_storage addr_storage;
+  char addr_str[INET6_ADDRSTRLEN];
+  socklen_t len = sizeof(addr_str);
+  getpeername(sock, (struct sockaddr*)&addr_storage, &len);
+  switch (addr_storage.ss_family) {
+    case AF_INET: {
+      struct sockaddr_in* addr = (struct sockaddr_in*)&addr_storage;
+      port = ntohs(addr->sin_port);
+      inet_ntop(AF_INET, &addr->sin_addr, addr_str, sizeof(addr_str));
+      break;
+    }
+    case AF_INET6: {
+      struct sockaddr_in6* addr = (struct sockaddr_in6*)&addr_storage;
+      port = ntohs(addr->sin6_port);
+      inet_ntop(AF_INET6, &addr->sin6_addr, addr_str, sizeof(addr_str));
+      break;
+    }
+    default:
+      LOG("Unknown socket family %d", addr_storage.ss_family);
+      return;
+  }
+
+  LOG("%s:%d", addr_str, port);
+}
+
 void handle_requests(net_t* net, request_callback_t callback) {
   char request_buffer[MAX_URL_LENGTH + 2];  // + 2 for CR + LF
+  char addr6_str[INET6_ADDRSTRLEN];
+  char addr_str[INET_ADDRSTRLEN];
 
   while (!terminate) {
     if (stop) {
@@ -355,12 +384,12 @@ void handle_requests(net_t* net, request_callback_t callback) {
     }
 
     int client;
-    struct sockaddr client_addr;
-    socklen_t addr_len = 0;
-    if ((client = accept(net->socket, &client_addr, &addr_len)) < 0) {
+    if ((client = accept(net->socket, NULL, NULL)) < 0) {
       LOG_ERROR("Failed to accept connection");
       return;
     }
+
+    log_remote_info(client);
 
     SSL* ssl = SSL_new(net->ssl_ctx);
     SSL_set_fd(ssl, client);
@@ -385,9 +414,9 @@ void handle_requests(net_t* net, request_callback_t callback) {
           char* input = extract_input(&request_buffer[0]);
 
           if (input == NULL) {
-            LOG("%s", path);
+            LOG("*  %s", path);
           } else {
-            LOG("%s?%s", path, input);
+            LOG("*  %s?%s", path, input);
           }
 
           send_body_response(ssl, path_length, path, callback, input);
