@@ -183,7 +183,7 @@ static void send_status_response(SSL* ssl, int code, const char* meta) {
   size_t len;
   char* header = build_response_header(code, (char*)meta, &len);
   if (header != NULL) {
-    LOG("*  %d %s", code, meta);
+    LOG(" %d %s", code, meta);
     SSL_write(ssl, header, len);
     free(header);
   }
@@ -261,7 +261,7 @@ static void handle_success_response(SSL* ssl, response_t* response,
         total_size += current_length;
       }
 
-      LOG("*  %zu header + %zu body bytes sent (total: %zu)", header_length,
+      LOG(" %zu header + %zu body bytes sent (total: %zu)", header_length,
           total_size, total_size + header_length);
 
       free(header);
@@ -299,7 +299,7 @@ static void send_body_response(SSL* ssl, size_t path_length,
   client_cert_t* cert =
       (client_cert_t*)SSL_get_ex_data(ssl, get_client_cert_index());
   if (cert != NULL && cert->fingerprint != NULL) {
-    LOG("*  Fingerprint: %s", cert->fingerprint);
+    LOG("Fingerprint: %s", cert->fingerprint);
   }
 
   request_t request = {path_length, cert, path, input};
@@ -370,7 +370,7 @@ static void log_remote_info(int sock) {
       return;
   }
 
-  LOG("%s:%d", addr_str, port);
+  LOG_NOLF("%s:%d", addr_str, port);
 }
 
 void handle_requests(net_t* net, request_callback_t callback) {
@@ -414,9 +414,9 @@ void handle_requests(net_t* net, request_callback_t callback) {
           char* input = extract_input(&request_buffer[0]);
 
           if (input == NULL) {
-            LOG("*  %s", path);
+            LOG_NOLF(" %s", path);
           } else {
-            LOG("*  %s?%s", path, input);
+            LOG_NOLF(" %s?%s", path, input);
           }
 
           send_body_response(ssl, path_length, path, callback, input);

@@ -9,6 +9,7 @@
 #include <string.h>
 
 #define LOG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#define LOG_NOLF(fmt, ...) printf(fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...)                       \
   {                                               \
     if (errno > 0) {                              \
