@@ -30,6 +30,15 @@ write_fibonacci(20)
 >>-
 ```
 
+## Installation
+
+```
+git clone https://git.sr.ht/~panda-roux/MoonGem
+cd MoonGem && mkdir build && cd build
+cmake ..
+make && sudo make install
+```
+
 ## Usage
 
 ```
