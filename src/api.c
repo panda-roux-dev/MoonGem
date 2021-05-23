@@ -91,7 +91,7 @@ int api_head_get_input_sensitive(lua_State* L) {
 }
 
 int api_head_temp_redirect(lua_State* L) {
-  const char* uri = luaL_checkstring(L, 1);
+  const char* uri = luaL_checkstring(L, 2);
   lua_getglobal(L, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_RESPONSE_PTR);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -100,7 +100,7 @@ int api_head_temp_redirect(lua_State* L) {
 }
 
 int api_head_perm_redirect(lua_State* L) {
-  const char* uri = luaL_checkstring(L, 1);
+  const char* uri = luaL_checkstring(L, 2);
   lua_getglobal(L, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_RESPONSE_PTR);
   response_t* response = (response_t*)lua_touserdata(L, -1);
