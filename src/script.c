@@ -17,6 +17,9 @@
 #define FUNC_INPUT_SENSITIVE "get_sensitive_input"
 #define FUNC_CERT "get_cert"
 #define FUNC_CHECKCERT "has_cert"
+#define FUNC_REDIRECT "redirect"
+#define FUNC_TEMP_REDIRECT "temp_redirect"
+#define FUNC_PERM_REDIRECT "perm_redirect"
 
 #define TBL_BODY "BODY"
 #define FUNC_INCLUDE "include"
@@ -41,6 +44,10 @@ int api_head_get_input_sensitive(lua_State* L);
 int api_head_get_cert(lua_State* L);
 
 int api_head_has_cert(lua_State* L);
+
+int api_head_temp_redirect(lua_State* L);
+
+int api_head_perm_redirect(lua_State* L);
 
 int api_body_include(lua_State* L);
 
@@ -84,6 +91,9 @@ static void add_header_api_methods(lua_State* L) {
       {FUNC_INPUT_SENSITIVE, api_head_get_input_sensitive},
       {FUNC_CERT, api_head_get_cert},
       {FUNC_CHECKCERT, api_head_has_cert},
+      {FUNC_REDIRECT, api_head_temp_redirect},
+      {FUNC_TEMP_REDIRECT, api_head_temp_redirect},
+      {FUNC_PERM_REDIRECT, api_head_perm_redirect},
       {NULL, NULL},
   };
 
