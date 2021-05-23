@@ -195,12 +195,15 @@ int api_body_write(lua_State* L) {
 }
 
 int api_body_line(lua_State* L) {
-  const char* text = luaL_checkstring(L, 2);
-
   lua_getglobal(L, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_BUFFER);
 
-  lua_pushfstring(L, "%s" NEWLINE, text);
+  const char* text = lua_tostring(L, 2);
+  if (text != NULL) {
+    lua_pushfstring(L, "%s" NEWLINE, text);
+  } else {
+    lua_pushliteral(L, NEWLINE);
+  }
 
   lua_concat(L, 2);
   lua_setfield(L, -2, FLD_BUFFER);
