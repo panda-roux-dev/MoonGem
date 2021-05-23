@@ -60,25 +60,25 @@ A single global variable PATH contains the path of the requested page (i.e. /my/
 MoonGem exposes the following Lua functions for generating content:
 
 `BODY:include(<path>)`
-Inserts the contents of the file at <path>. Note that this DOES NOT run embedded scripts in the source document if a Gemtext file is specified. This is an intentional choice for the sake of simplicity.
+Inserts the contents of the file at `path`. Note that this DOES NOT run embedded scripts in the source document if a Gemtext file is specified. This is an intentional choice for the sake of simplicity.
 
 `BODY:write(<text>)`
-Writes <text> to the body of the document. No new-line character is appended.
+Writes `text` to the body of the document. No new-line character is appended.
 
-`BODY:line(<text>)`
-Writes <text> to the body of the document, followed by a new-line character.
+`BODY:line([text])`
+Writes `text` to the body of the document, followed by a new-line sequence.  If `text` is omitted, only the new-line sequence is written.
 
 `BODY:link(<url>, [text])`
-Writes a link pointing to <url> to the body of the document. Optionally, [text] can be specified in order to append link alt-text.
+Writes a link pointing to `url` to the body of the document. Optionally, `text` can be specified in order to append link alt-text.
 
 `BODY:heading(<text>, <level>)`
-Writes <text> as a heading line to the body of the document. The value of <level> indicates the heading level (in other words, <level> == number of #'s).
+Writes `text` as a heading line to the body of the document. The value of `level` indicates the heading level (in other words, `level` == number of #'s).
 
 `BODY:block(<text>)`
-Writes <text> in a preformatted block.
+Writes `text` in a preformatted block.
 
 `BODY:begin_block([alt-text])`
-Writes the beginning of a preformatted block with optional [alt-text].
+Writes the beginning of a preformatted block with optional `alt-text`.
 
 `BODY:end_block()`
 Writes the end of a preformatted block.
@@ -93,9 +93,13 @@ Prompts the client for input and returns the result.
 Returns `true` if the client provided a certificate on this request; otherwise, `false`.
 
 `HEAD:get_cert([prompt])`
-If no client certificate was sent along with the current request, sends a code-60 status response to the client along with the optioal prompt, and returns `nil`.  The client should then repeat the request with a valid certificate.  Otherwise, if a certificate is present, returns a table with the following structure fields:
+If no client certificate was sent along with the current request, sends a code-60 status response to the client along with the optioal prompt, and returns `nil`.  The client should then repeat the request with a valid certificate.  Otherwise, if a certificate is present, returns a table with the following fields:
 - `fingerprint`: a string representation of a SHA256 hash of the client certificate's public key
 - `not_after`: the certificate's expiration time, in seconds since the UNIX epoch
+
+`HEAD:temp_redirect(<url>), HEAD:perm_redirect(<url>)`
+Sends a redirect response to the client (either temporary or permanent).
+Note that `HEAD:redirect(<url>)` is an alias for `HEAD:temp_redirect(<url>)`.
 
 
 ## Source
