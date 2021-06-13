@@ -32,6 +32,8 @@ static void set_interrupt_response(response_t* response, int status,
 }
 
 int api_head_set_lang(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* lang = luaL_checkstring(L, 2);
 
   lua_getglobal(L, TBL_RESPONSE);
@@ -49,6 +51,8 @@ int api_head_set_lang(lua_State* L) {
 }
 
 int api_head_get_input(lua_State* L) {
+  lua_settop(L, 2);
+
   lua_getglobal(L, FLD_INPUT);
   if (lua_isnoneornil(L, -1)) {
     lua_getglobal(L, TBL_RESPONSE);
@@ -70,6 +74,8 @@ int api_head_get_input(lua_State* L) {
 }
 
 int api_head_get_input_sensitive(lua_State* L) {
+  lua_settop(L, 2);
+
   lua_getglobal(L, FLD_INPUT);
   if (lua_isnoneornil(L, -1)) {
     lua_getglobal(L, TBL_RESPONSE);
@@ -91,6 +97,8 @@ int api_head_get_input_sensitive(lua_State* L) {
 }
 
 int api_head_temp_redirect(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* uri = luaL_checkstring(L, 2);
   lua_getglobal(L, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_RESPONSE_PTR);
@@ -100,6 +108,8 @@ int api_head_temp_redirect(lua_State* L) {
 }
 
 int api_head_perm_redirect(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* uri = luaL_checkstring(L, 2);
   lua_getglobal(L, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_RESPONSE_PTR);
@@ -109,6 +119,8 @@ int api_head_perm_redirect(lua_State* L) {
 }
 
 int api_head_get_cert(lua_State* L) {
+  lua_settop(L, 2);
+
   lua_getglobal(L, TBL_REQUEST);
   lua_getfield(L, -1, FLD_REQUEST_PTR);
   request_t* request = (request_t*)lua_touserdata(L, -1);
@@ -155,6 +167,8 @@ int api_head_has_cert(lua_State* L) {
 }
 
 int api_body_include(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* path = luaL_checkstring(L, 2);
 
   char* contents = NULL;
@@ -181,6 +195,8 @@ int api_body_include(lua_State* L) {
 }
 
 int api_body_write(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* text = luaL_checkstring(L, 2);
 
   lua_getglobal(L, TBL_RESPONSE);
@@ -195,6 +211,8 @@ int api_body_write(lua_State* L) {
 }
 
 int api_body_line(lua_State* L) {
+  lua_settop(L, 2);
+
   lua_getglobal(L, TBL_RESPONSE);
   lua_getfield(L, -1, FLD_BUFFER);
 
@@ -212,6 +230,8 @@ int api_body_line(lua_State* L) {
 }
 
 int api_body_link(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* url = luaL_checkstring(L, 2);
 
   lua_getglobal(L, TBL_RESPONSE);
@@ -235,6 +255,8 @@ int api_body_link(lua_State* L) {
 }
 
 int api_body_heading(lua_State* L) {
+  lua_settop(L, 3);
+
   const char* text = luaL_checkstring(L, 2);
 
   int level = luaL_optinteger(L, 3, 1);
@@ -255,6 +277,8 @@ int api_body_heading(lua_State* L) {
 }
 
 int api_body_quote(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* text = luaL_checkstring(L, 2);
 
   lua_getglobal(L, TBL_RESPONSE);
@@ -269,6 +293,8 @@ int api_body_quote(lua_State* L) {
 }
 
 int api_body_block(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* text = luaL_checkstring(L, 2);
 
   lua_getglobal(L, TBL_RESPONSE);
@@ -284,6 +310,8 @@ int api_body_block(lua_State* L) {
 }
 
 int api_body_beginblock(lua_State* L) {
+  lua_settop(L, 2);
+
   const char* alt = luaL_checkstring(L, 2);
 
   lua_getglobal(L, TBL_REQUEST);
