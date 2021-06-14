@@ -30,6 +30,12 @@ write_fibonacci(20)
 >>-
 ```
 
+## Dependencies
+
+OpenSSL 1.1.1 or later
+Lua 5.4 (5.3 may work but I haven't tried it)
+LibMagic (for mimetype identification)
+
 ## Installation
 
 ```
@@ -37,6 +43,18 @@ git clone https://git.sr.ht/~panda-roux/MoonGem
 cd MoonGem && mkdir build && cd build
 cmake ..
 make && sudo make install
+```
+
+or
+
+```
+# download and run the image (see docker-deploy.sh)
+docker pull pandarouxdev/moongem && \
+  docker run -dp 1965:1965 \
+    --name moongem-1 \
+    --mount source=moongem-content,target=/gemini \
+    --mount source=moongem-certs,target=/certs,readonly \
+    moongem
 ```
 
 ## Usage
@@ -71,7 +89,7 @@ Writes `text` to the body of the document, followed by a new-line sequence.  If 
 `BODY:link(<url>, [text])`
 Writes a link pointing to `url` to the body of the document. Optionally, `text` can be specified in order to append link alt-text.
 
-`BODY:heading(<text>, <level>)`
+`BODY:heading(<text>, [level])`
 Writes `text` as a heading line to the body of the document. The value of `level` indicates the heading level (in other words, `level` == number of #'s).
 
 `BODY:block(<text>)`
