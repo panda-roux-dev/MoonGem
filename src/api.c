@@ -230,7 +230,7 @@ int api_body_line(lua_State* L) {
 }
 
 int api_body_link(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 3);
 
   const char* url = luaL_checkstring(L, 2);
 
