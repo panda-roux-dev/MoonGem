@@ -76,7 +76,8 @@ static SSL_CTX* init_ssl_context(void) {
                      handle_client_certificate);
   SSL_CTX_set_verify_depth(ctx, 0);
   SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
-  SSL_CTX_set_options(ctx, SSL_OP_NO_TICKET);
+  SSL_CTX_set_options(
+      ctx, SSL_OP_NO_TICKET | SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
 
   return ctx;
 }
