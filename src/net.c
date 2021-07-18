@@ -73,6 +73,7 @@ static SSL_CTX* init_ssl_context(void) {
   SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
                      handle_client_certificate);
   SSL_CTX_set_verify_depth(ctx, 0);
+  SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
 
   return ctx;
 }
