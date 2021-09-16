@@ -78,7 +78,7 @@ net_t* init_socket(int port, const char* cert_path, const char* key_path);
 
 void destroy_socket(net_t* net);
 
-void handle_requests(net_t* net, request_callback_t callback);
+void handle_gemini_requests(net_t* net, request_callback_t callback);
 
 #endif
 

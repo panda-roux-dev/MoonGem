@@ -1,3 +1,6 @@
+#define _GNU_SOURCE
+
+#include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -5,8 +8,52 @@
 #include "log.h"
 #include "util.h"
 
-#define DEFAULT_PORT 1965
-#define VAR_MOONGEM_PORT "MOONGEM_PORT"
+#define THREAD_NAME_GEMINI "listener-gemini"
+#define THREAD_NAME_HTTP "listener-http"
+
+#define DEFAULT_GEMINI_PORT 1965
+#define DEFAULT_HTTP_PORT 80
+
+#define VAR_GEMINI_PORT "MOONGEM_GEMINI_PORT"
+#define VAR_HTTP_PORT "MOONGEM_HTTP_PORT"
+
+typedef struct cli_options_t {
+  char* cert_path;
+  char* key_path;
+} cli_options_t;
+
+void* listen_for_gemini_requests(void* ptr) {
+  int port = get_env_int(VAR_GEMINI_PORT, DEFAULT_GEMINI_PORT);
+  cli_options_t* options = (cli_options_t*)ptr;
+
+  // set up socket + TLS
+  net_t* sock;
+  if ((sock = init_socket(port, options->cert_path, options->key_path)) ==
+      NULL) {
+    LOG_ERROR("Failed to initialize socket for Gemini listener");
+  } else {
+    // begin listening for requests
+    handle_gemini_requests(sock, handle_request);
+    destroy_socket(sock);
+  }
+
+  return NULL;
+}
+
+void* listen_for_http_requests(void* ptr) {
+  int port = get_env_int(VAR_HTTP_PORT, DEFAULT_HTTP_PORT);
+  cli_options_t* options = (cli_options_t*)ptr;
+
+  net_t* sock;
+  if ((sock = init_socket(port, options->cert_path, options->key_path)) ==
+      NULL) {
+    LOG_ERROR("Failed to initialize socket for HTTP listener");
+  } else {
+    destroy_socket(sock);
+  }
+
+  return NULL;
+}
 
 int main(int argc, const char** argv) {
   if (argc < 3) {
@@ -15,17 +62,10 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
+  cli_options_t options = {realpath(argv[1], NULL), realpath(argv[2], NULL)};
+
   if (!check_privileges()) {
     // don't run if we can't drop privileges
-    return EXIT_FAILURE;
-  }
-
-  int port = get_env_int(VAR_MOONGEM_PORT, DEFAULT_PORT);
-
-  // set up socket + TLS
-  net_t* sock;
-  if ((sock = init_socket(port, argv[1], argv[2])) == NULL) {
-    LOG_ERROR("Failed to intiialize network socket.  Terminating...");
     return EXIT_FAILURE;
   }
 
@@ -35,10 +75,17 @@ int main(int argc, const char** argv) {
     chdir(cwd);
   }
 
-  // begin listening for requests
-  handle_requests(sock, handle_request);
+  pthread_t gemini_thread;
+  // pthread_t http_thread;
 
-  destroy_socket(sock);
+  pthread_create(&gemini_thread, NULL, listen_for_gemini_requests, &options);
+
+  pthread_setname_np(gemini_thread, THREAD_NAME_GEMINI);
+
+  pthread_join(gemini_thread, NULL);
+
+  free(options.cert_path);
+  free(options.key_path);
 
   return EXIT_SUCCESS;
 }

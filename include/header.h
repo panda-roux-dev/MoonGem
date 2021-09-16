@@ -7,7 +7,7 @@
 
 typedef struct response_t response_t;
 
-char* extract_input(char* request);
+size_t extract_input(const char* request, char* input);
 
 int extract_path(char* request, char* buffer, size_t* length);
 

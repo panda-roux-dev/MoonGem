@@ -12,14 +12,17 @@
 #include "cert.h"
 #include "hashdef.h"
 #include "header.h"
+#include "http.h"
 #include "log.h"
 #include "status.h"
+#include "util.h"
 
 #define CREATE_SOCKET_FAILURE INT_MIN
 #define SET_CERTS_FAILURE INT_MIN
 
+#define HTTP_REQUEST_BUFFER_LENGTH 8192
+#define HTTP_MAX_REQUEST_LENGTH (HTTP_REQUEST_BUFFER_LENGTH * 1000)
 #define RESPONSE_BODY_BUFFER_LENGTH 4096
-
 #define ERROR_MSG "Server error"
 
 static volatile sig_atomic_t terminate = 0;
@@ -297,10 +300,8 @@ static void handle_error_response(SSL* ssl, response_t* response) {
   send_status_response(ssl, response->status, response->meta);
 }
 
-static void send_body_response(SSL* ssl, size_t path_length,
-                               const char* const path,
-                               request_callback_t callback,
-                               const char* const input) {
+static void send_body_response(SSL* ssl, size_t path_length, const char* path,
+                               request_callback_t callback, const char* input) {
   client_cert_t* cert =
       (client_cert_t*)SSL_get_ex_data(ssl, get_client_cert_index());
 
@@ -375,11 +376,48 @@ static void log_remote_info(int sock) {
   LOG_NOLF("[%s:%d]", addr_str, port);
 }
 
-void handle_requests(net_t* net, request_callback_t callback) {
-  char request_buffer[MAX_URL_LENGTH + 2];  // + 2 for CR + LF
-  char addr6_str[INET6_ADDRSTRLEN];
-  char addr_str[INET_ADDRSTRLEN];
+void handle_http_requests(net_t* net, request_callback_t callback) {
+  while (!terminate) {
+    if (stop) {
+      wait_until_continue();
+    }
 
+    int client;
+    if ((client = accept(net->socket, NULL, NULL)) < 0) {
+      LOG_ERROR("Failed to accept connection");
+      return;
+    }
+
+    log_remote_info(client);
+
+    text_buffer_t* request_body = create_buffer();
+
+    char read_buffer[HTTP_REQUEST_BUFFER_LENGTH];
+    int read_length = 0;
+    while ((read_length =
+                read(client, read_buffer, HTTP_REQUEST_BUFFER_LENGTH)) > 0) {
+      buffer_append(request_body, read_buffer, read_length);
+      if (request_body->length >= HTTP_MAX_REQUEST_LENGTH) {
+        LOG_ERROR(
+            "Terminating the request early as maximum request size of %d "
+            "bytes has been reached",
+            HTTP_MAX_REQUEST_LENGTH);
+
+        // TODO: return error "413: Payload Too Large"
+        write_status_code_response(client, 413, "Payload Too Large");
+        break;
+      }
+    }
+
+    write_status_code_response(client, 200, "OK");
+
+    clear_buffer(request_body);
+
+    close(client);
+  }
+}
+
+void handle_gemini_requests(net_t* net, request_callback_t callback) {
   while (!terminate) {
     if (stop) {
       wait_until_continue();
@@ -400,35 +438,28 @@ void handle_requests(net_t* net, request_callback_t callback) {
     if (SSL_accept(ssl) <= 0) {
       ERR_print_errors_fp(stderr);
     } else {
+      char request_buffer[MAX_URL_LENGTH + 2];  // + 2 for CR + LF
       memset(&request_buffer[0], '\0', sizeof(request_buffer) / sizeof(char));
       SSL_read(ssl, &request_buffer[0], sizeof(request_buffer) / sizeof(char));
 
       size_t path_length;
-      char* path = malloc(sizeof(char) * MAX_URL_LENGTH);
-      if (path == NULL) {
-        LOG_ERROR(
-            "Failed to allocate enough memory for the incoming request path");
-        send_status_response(ssl, STATUS_TEMPORARY_FAILURE, ERROR_MSG);
+      char path[MAX_URL_LENGTH];
+      memset(&path[0], 0, sizeof(path) / sizeof(char));
+      if (extract_path(&request_buffer[0], path, &path_length) != 0) {
+        send_status_response(ssl, STATUS_BAD_REQUEST,
+                             strndup(&request_buffer[0], path_length));
       } else {
-        if (extract_path(&request_buffer[0], path, &path_length) != 0) {
-          send_status_response(ssl, STATUS_BAD_REQUEST, "Invalid URL");
+        char input[MAX_URL_LENGTH];
+        memset(&input[0], 0, sizeof(input) / sizeof(char));
+        size_t input_len = extract_input(&request_buffer[0], &input[0]);
+
+        if (input_len == 0) {
+          LOG_NOLF(" %s", path);
+          send_body_response(ssl, path_length, path, callback, NULL);
         } else {
-          char* input = extract_input(&request_buffer[0]);
-
-          if (input == NULL) {
-            LOG_NOLF(" %s", path);
-          } else {
-            LOG_NOLF(" %s?%s", path, input);
-          }
-
+          LOG_NOLF(" %s?%s", path, input);
           send_body_response(ssl, path_length, path, callback, input);
-
-          if (input != NULL) {
-            free(input);
-          }
         }
-
-        free(path);
       }
     }
 

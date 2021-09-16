@@ -18,6 +18,7 @@ set(SRC_FILES
   "${MOONGEM_SRC_DIR}/main.c"
   "${MOONGEM_SRC_DIR}/script.c"
   "${MOONGEM_SRC_DIR}/api.c"
+  "${MOONGEM_SRC_DIR}/http.c"
   "${MOONGEM_SRC_DIR}/parse.c"
   "${MOONGEM_SRC_DIR}/net.c"
   "${MOONGEM_SRC_DIR}/cert.c"
@@ -30,15 +31,19 @@ set(CMAKE_C_FLAGS_DEBUG
 set(CMAKE_C_FLAGS_RELEASE
   "${CMAKE_C_FLAGS_RELEASE} -ffunction-sections -flto -O2 -fmerge-all-constants -fdata-sections")
 
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+
 find_package(OpenSSL 1.1.1 REQUIRED)
 find_package(Lua 5.4 REQUIRED)
 find_package(LibMagic REQUIRED)
+find_package(Threads REQUIRED)
 
 add_executable(${MOONGEM_EXE} ${SRC_FILES})
 target_link_libraries(${MOONGEM_EXE} PRIVATE
   ${LIBMAGIC_LIBRARIES}
   ${LUA_LIBRARIES}
-  ${OPENSSL_LIBRARIES})
+  ${OPENSSL_LIBRARIES}
+  ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(${MOONGEM_EXE} PRIVATE
   ${MOONGEM_INCLUDE_DIR}
   ${LIBMAGIC_INCLUDES}

@@ -18,25 +18,24 @@
 
 #define EXTRACT_PATH_FAILURE INT_MIN
 
-char* extract_input(char* request) {
+size_t extract_input(const char* request, char* input) {
   char* term = strstr(request, URL_TERMINATOR);
   if (term == NULL) {
-    return NULL;
+    return 0;
   }
 
   char* input_delim = memchr(request, URL_INPUT_DELIMITER, term - request);
   if (input_delim == NULL) {
-    return NULL;
+    return 0;
   }
 
   ++input_delim;  // skip delimiter
 
   size_t input_len = term - input_delim;
-  char* input = malloc((input_len + 1) * sizeof(char));
   memcpy(input, input_delim, input_len * sizeof(char));
   input[input_len] = '\0';
 
-  return input;
+  return input_len;
 }
 
 int extract_path(char* request, char* buffer, size_t* length) {
