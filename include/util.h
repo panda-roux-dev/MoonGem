@@ -23,6 +23,8 @@ void install_signal_handler(void);
 
 void wait_until_continue(void);
 
+bool is_dir(const char* path);
+
 text_buffer_t* create_buffer(void);
 
 int buffer_append(text_buffer_t* buf, char* contents, size_t length);

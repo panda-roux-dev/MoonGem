@@ -62,7 +62,7 @@ void init_body_builder(response_body_builder_t* builder,
                        response_body_callback_t body_cb,
                        response_cleanup_callback_t cleanup, void* data);
 
-void handle_gemini_requests(net_t* net, request_callback_t callback);
+void handle_gemini_requests(net_t* net);
 
 void set_response_status(response_t* response, int status, const char* msg);
 

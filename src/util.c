@@ -57,6 +57,8 @@ void wait_until_continue(void) {
   }
 }
 
+bool is_dir(const char* path) { return strrchr(path, '.') == NULL; }
+
 int get_env_int(const char* name, int default_value) {
   char* str = getenv(name);
   int value = default_value;

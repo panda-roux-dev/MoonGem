@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gemini.h"
 #include "log.h"
-#include "net.h"
 
 #define MAX_META_LENGTH 1024
 #define HEADER_BUFFER_LENGTH 1029  // code(2) + space(1) + meta(1024) + \r\n

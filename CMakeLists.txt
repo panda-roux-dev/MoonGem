@@ -23,7 +23,6 @@ set(SRC_FILES
   "${MOONGEM_SRC_DIR}/net.c"
   "${MOONGEM_SRC_DIR}/cert.c"
   "${MOONGEM_SRC_DIR}/header.c"
-  "${MOONGEM_SRC_DIR}/handler.c"
   "${MOONGEM_SRC_DIR}/util.c")
 
 set(CMAKE_C_FLAGS_DEBUG

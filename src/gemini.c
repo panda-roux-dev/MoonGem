@@ -10,9 +10,11 @@
 #include "header.h"
 #include "log.h"
 #include "net.h"
+#include "parse.h"
 #include "status.h"
 #include "util.h"
 
+#define MIMETYPE_GEMTEXT "text/gemini; encoding=utf-8"
 #define RESPONSE_BODY_BUFFER_LENGTH 4096
 #define ERROR_MSG "Server error"
 #define DEFAULT_DOCUMENT "index.gmi"
@@ -26,8 +28,6 @@ static bool path_is_gmi(const char* path) {
 
   return strcmp(strrchr(path, '.'), EXT_GMI) == 0;
 }
-
-static bool is_dir(const char* path) { return strrchr(path, '.') == NULL; }
 
 static char* append_default_doc(const request_t* request) {
   size_t path_buf_len =
@@ -90,6 +90,52 @@ static void free_response_fields(response_t* response) {
   if (response->language != NULL) {
     free(response->language);
   }
+}
+
+callback_result_t handle_gemini_request(const request_t* request,
+                                        response_t* response,
+                                        response_body_builder_t* builder) {
+  // if the requested path is a directory, append the default document
+  // 'index.gmi' onto it for the purposes of file IO
+  char* path = is_dir(request->path)
+                   ? append_default_doc(request)
+                   : strndup(request->path, request->path_length);
+
+  callback_result_t result = ERROR;
+
+  if (path_is_illegal(path)) {
+    // don't permit directory browsing
+    set_response_status(response, STATUS_BAD_REQUEST, "Invalid URL");
+    goto finish;
+  }
+
+  FILE* file = fopen(path + 1, "rb");
+  if (file == NULL) {
+    set_response_status(response, STATUS_NOT_FOUND, strerror(errno));
+    goto finish;
+  }
+
+  if (path_is_gmi(path)) {
+    // parse .gmi files into gemtext
+
+    parser_t* parser = create_doc_parser(request, response, file);
+    init_body_builder(builder, response_body_parser_cb,
+                      response_parser_cleanup_cb, parser);
+    response->mimetype = strdup(MIMETYPE_GEMTEXT);
+    result = OK;
+  } else {
+    // serve any file that doesn't have a .gmi extension in a simple static
+    // operation
+
+    init_body_builder(builder, response_body_static_file_cb,
+                      response_static_file_cleanup_cb, file);
+    response->mimetype = get_mimetype(path + 1);
+    result = OK;
+  }
+
+finish:
+  free(path);
+  return result;
 }
 
 static void handle_success_response(SSL* ssl, response_t* response,
@@ -191,7 +237,7 @@ static client_cert_t* create_client_cert() {
 }
 
 static void send_body_response(SSL* ssl, size_t path_length, const char* path,
-                               request_callback_t callback, const char* input) {
+                               const char* input) {
   client_cert_t* cert =
       (client_cert_t*)SSL_get_ex_data(ssl, get_client_cert_index());
 
@@ -199,7 +245,7 @@ static void send_body_response(SSL* ssl, size_t path_length, const char* path,
   response_t response = {0, NULL, NULL, NULL, false};
 
   response_body_builder_t builder;
-  switch (callback(&request, &response, &builder)) {
+  switch (handle_gemini_request(&request, &response, &builder)) {
     case OK:
       handle_success_response(ssl, &response, &builder);
       break;
@@ -225,7 +271,7 @@ void init_body_builder(response_body_builder_t* builder,
   builder->data = data;
 }
 
-void handle_gemini_requests(net_t* net, request_callback_t callback) {
+void handle_gemini_requests(net_t* net) {
   while (!should_terminate()) {
     if (is_stopped()) {
       wait_until_continue();
@@ -263,10 +309,10 @@ void handle_gemini_requests(net_t* net, request_callback_t callback) {
 
         if (input_len == 0) {
           LOG_NOLF(" %s", path);
-          send_body_response(ssl, path_length, path, callback, NULL);
+          send_body_response(ssl, path_length, path, NULL);
         } else {
           LOG_NOLF(" %s?%s", path, input);
-          send_body_response(ssl, path_length, path, callback, input);
+          send_body_response(ssl, path_length, path, input);
         }
       }
     }

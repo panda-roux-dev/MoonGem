@@ -35,7 +35,7 @@ void* listen_for_gemini_requests(void* ptr) {
   } else {
     // begin listening for requests
     LOG("Listening for Gemini requests on port %d...", port);
-    handle_gemini_requests(sock, handle_request);
+    handle_gemini_requests(sock);
     destroy_socket(sock);
   }
 

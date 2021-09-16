@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gemini.h"
 #include "log.h"
-#include "net.h"
 #include "script.h"
 #include "status.h"
 #include "util.h"

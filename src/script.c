@@ -7,8 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gemini.h"
 #include "log.h"
-#include "net.h"
 #include "status.h"
 
 #define TBL_HEADER "HEAD"
