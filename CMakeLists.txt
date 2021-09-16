@@ -16,6 +16,7 @@ set(MOONGEM_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(MOONGEM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(SRC_FILES
   "${MOONGEM_SRC_DIR}/main.c"
+  "${MOONGEM_SRC_DIR}/buffer.c"
   "${MOONGEM_SRC_DIR}/script.c"
   "${MOONGEM_SRC_DIR}/api.c"
   "${MOONGEM_SRC_DIR}/gemini.c"

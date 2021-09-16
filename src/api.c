@@ -5,8 +5,8 @@
 #include <string.h>
 
 #include "cert.h"
+#include "gemini.h"
 #include "log.h"
-#include "net.h"
 #include "script.h"
 #include "status.h"
 #include "util.h"

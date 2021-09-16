@@ -1,21 +1,22 @@
 #include "parse.h"
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "buffer.h"
 #include "gemini.h"
 #include "log.h"
 #include "script.h"
 #include "status.h"
-#include "util.h"
 
 #define LINE_SCRIPT_START "-<<"
 #define LINE_SCRIPT_END ">>-"
 #define DELIM_SIZE ((sizeof(LINE_SCRIPT_START) - 1) / sizeof(char))
 #define LINE_BUFFER_SIZE 2048
 #define MAX_LANGUAGE_LEN 32
-;
+
 typedef enum { TEXT, SCRIPT_START, SCRIPT_END } line_type_t;
 
 typedef struct doc_state_t {

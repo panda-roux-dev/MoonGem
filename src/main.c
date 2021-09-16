@@ -5,7 +5,6 @@
 #include <unistd.h>
 
 #include "gemini.h"
-#include "handler.h"
 #include "log.h"
 #include "util.h"
 
