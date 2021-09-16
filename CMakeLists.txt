@@ -18,7 +18,7 @@ set(SRC_FILES
   "${MOONGEM_SRC_DIR}/main.c"
   "${MOONGEM_SRC_DIR}/script.c"
   "${MOONGEM_SRC_DIR}/api.c"
-  "${MOONGEM_SRC_DIR}/http.c"
+  "${MOONGEM_SRC_DIR}/gemini.c"
   "${MOONGEM_SRC_DIR}/parse.c"
   "${MOONGEM_SRC_DIR}/net.c"
   "${MOONGEM_SRC_DIR}/cert.c"
@@ -33,6 +33,8 @@ set(CMAKE_C_FLAGS_RELEASE
 
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
+find_package(PkgConfig)
+pkg_check_modules(MHD libmicrohttpd)
 find_package(OpenSSL 1.1.1 REQUIRED)
 find_package(Lua 5.4 REQUIRED)
 find_package(LibMagic REQUIRED)
@@ -51,6 +53,18 @@ target_include_directories(${MOONGEM_EXE} PRIVATE
   ${OPENSSL_INCLUDE_DIR})
 
 install(TARGETS ${MOONGEM_EXE} DESTINATION bin)
+
+if (NOT DISABLE_HTTP)
+  if (MHD_FOUND)
+    message(STATUS "The HTTP proxying feature is enabled; define DISABLE_HTTP to disable it.")
+    target_link_libraries(${MOONGEM_EXE} PRIVATE ${MHD_LIBRARIES})
+    target_include_directories(${MOONGEM_EXE} PRIVATE ${MHD_INCLUDE_DIRS})
+    target_compile_options(${MOONGEM_EXE} PRIVATE ${MHD_CFLAGS_OTHER})
+    target_compile_definitions(${MOONGEM_EXE} PRIVATE HTTP_PROXY_ENABLED=1)
+  else()
+    message(STATUS "libmicrohttpd was not found, so HTTP proxying will be unavailable.")
+  endif()
+endif()
 
 if(DISABLE_LOGGING)
   target_compile_definitions(${MOONGEM_EXE} PRIVATE MOONGEM_DISABLE_LOGGING)

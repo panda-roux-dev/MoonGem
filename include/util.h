@@ -15,19 +15,19 @@ typedef struct {
   char* buffer;
 } text_buffer_t;
 
-text_buffer_t* create_buffer();
+bool should_terminate(void);
+
+bool is_stopped(void);
+
+void install_signal_handler(void);
+
+void wait_until_continue(void);
+
+text_buffer_t* create_buffer(void);
 
 int buffer_append(text_buffer_t* buf, char* contents, size_t length);
 
 void destroy_buffer(text_buffer_t* buf);
-
-bool path_is_gmi(const char* path);
-
-bool is_dir(const char* path);
-
-char* append_default_doc(const request_t* request);
-
-bool path_is_illegal(const char* path);
 
 void clear_buffer(text_buffer_t* buf);
 

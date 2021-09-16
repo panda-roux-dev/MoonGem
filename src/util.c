@@ -1,6 +1,7 @@
 #include "util.h"
 
 #include <magic.h>
+#include <signal.h>
 #include <status.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,9 +13,49 @@
 
 #define BUFFER_DEFAULT_SIZE 1024
 #define FILE_BUFFER_SIZE 2048
-#define DEFAULT_DOCUMENT "index.gmi"
-#define EXT_GMI ".gmi"
-#define INVALID_URL_PATTERNS "/..", "/.", "/../", "/./", "~/", "$"
+
+static volatile sig_atomic_t terminate = 0;
+static volatile sig_atomic_t stop = 0;
+
+static void sig_terminate_handler(int sig) { terminate = 1; }
+
+static void sig_stop_handler(int sig) { stop = 1; }
+
+static void sig_kill_handler(int _) { exit(EXIT_FAILURE); }
+
+bool should_terminate(void) { return terminate; }
+
+bool is_stopped(void) { return stop; }
+
+void install_signal_handler(void) {
+  signal(SIGKILL, sig_kill_handler);
+  signal(SIGTERM, sig_terminate_handler);
+  signal(SIGABRT, sig_terminate_handler);
+  signal(SIGINT, sig_terminate_handler);
+  signal(SIGSTOP, sig_stop_handler);
+  signal(SIGTSTP, sig_stop_handler);
+}
+
+void wait_until_continue(void) {
+  sigset_t set;
+  sigemptyset(&set);
+  sigaddset(&set, SIGCONT);
+  sigaddset(&set, SIGKILL);
+  sigaddset(&set, SIGABRT);
+  sigaddset(&set, SIGINT);
+
+  int sig;
+  sigwait(&set, &sig);
+
+  stop = 0;
+  if (sig != SIGCONT) {
+    if (sig != SIGKILL) {
+      terminate = 1;
+    } else {
+      exit(EXIT_FAILURE);
+    }
+  }
+}
 
 int get_env_int(const char* name, int default_value) {
   char* str = getenv(name);
@@ -28,51 +69,6 @@ int get_env_int(const char* name, int default_value) {
   }
 
   return value;
-}
-
-bool path_is_gmi(const char* path) {
-  if (path == NULL) {
-    return false;
-  }
-
-  return strcmp(strrchr(path, '.'), EXT_GMI) == 0;
-}
-
-bool is_dir(const char* path) { return strrchr(path, '.') == NULL; }
-
-char* append_default_doc(const request_t* request) {
-  size_t path_buf_len =
-      (request->path_length) + sizeof(DEFAULT_DOCUMENT) / sizeof(char);
-  char* path = malloc((path_buf_len + 1) * sizeof(char));
-  if (path == NULL) {
-    LOG_ERROR("Failed to append default document name to URL");
-    return NULL;
-  }
-
-  memcpy(path, request->path, request->path_length * sizeof(char));
-  if (request->path[request->path_length - 1] != '/') {
-    path[request->path_length] = '/';
-    memcpy(&path[request->path_length + 1], &DEFAULT_DOCUMENT[0],
-           sizeof(DEFAULT_DOCUMENT));
-  } else {
-    memcpy(&path[request->path_length], &DEFAULT_DOCUMENT[0],
-           sizeof(DEFAULT_DOCUMENT));
-  }
-
-  path[path_buf_len] = '\0';
-
-  return path;
-}
-
-bool path_is_illegal(const char* path) {
-  const char* bad_strings[] = {INVALID_URL_PATTERNS};
-  for (int i = 0; i < sizeof(bad_strings) / sizeof(char*); ++i) {
-    if (strstr(path, bad_strings[i]) != NULL) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 text_buffer_t* create_buffer() {

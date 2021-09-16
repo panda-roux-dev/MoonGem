@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "gemini.h"
 #include "handler.h"
 #include "log.h"
 #include "util.h"
@@ -12,7 +13,7 @@
 #define THREAD_NAME_HTTP "listener-http"
 
 #define DEFAULT_GEMINI_PORT 1965
-#define DEFAULT_HTTP_PORT 80
+#define DEFAULT_HTTP_PORT 8080
 
 #define VAR_GEMINI_PORT "MOONGEM_GEMINI_PORT"
 #define VAR_HTTP_PORT "MOONGEM_HTTP_PORT"
@@ -28,27 +29,13 @@ void* listen_for_gemini_requests(void* ptr) {
 
   // set up socket + TLS
   net_t* sock;
-  if ((sock = init_socket(port, options->cert_path, options->key_path)) ==
+  if ((sock = init_tls_socket(port, options->cert_path, options->key_path)) ==
       NULL) {
     LOG_ERROR("Failed to initialize socket for Gemini listener");
   } else {
     // begin listening for requests
+    LOG("Listening for Gemini requests on port %d...", port);
     handle_gemini_requests(sock, handle_request);
-    destroy_socket(sock);
-  }
-
-  return NULL;
-}
-
-void* listen_for_http_requests(void* ptr) {
-  int port = get_env_int(VAR_HTTP_PORT, DEFAULT_HTTP_PORT);
-  cli_options_t* options = (cli_options_t*)ptr;
-
-  net_t* sock;
-  if ((sock = init_socket(port, options->cert_path, options->key_path)) ==
-      NULL) {
-    LOG_ERROR("Failed to initialize socket for HTTP listener");
-  } else {
     destroy_socket(sock);
   }
 
@@ -75,11 +62,11 @@ int main(int argc, const char** argv) {
     chdir(cwd);
   }
 
+  // handle SIGPIPE events
+  install_signal_handler();
+
   pthread_t gemini_thread;
-  // pthread_t http_thread;
-
   pthread_create(&gemini_thread, NULL, listen_for_gemini_requests, &options);
-
   pthread_setname_np(gemini_thread, THREAD_NAME_GEMINI);
 
   pthread_join(gemini_thread, NULL);
