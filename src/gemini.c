@@ -1,7 +1,10 @@
 #include "gemini.h"
 
+#define _GNU_SOURCE
+
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -14,6 +17,9 @@
 #include "status.h"
 #include "util.h"
 
+#define THREAD_NAME_GEMINI "listener-gemini"
+#define DEFAULT_GEMINI_PORT 1965
+#define VAR_GEMINI_PORT "MOONGEM_GEMINI_PORT"
 #define MIMETYPE_GEMTEXT "text/gemini; encoding=utf-8"
 #define RESPONSE_BODY_BUFFER_LENGTH 4096
 #define ERROR_MSG "Server error"
@@ -263,15 +269,7 @@ static void send_body_response(SSL* ssl, size_t path_length, const char* path,
   free_response_fields(&response);
 }
 
-void init_body_builder(response_body_builder_t* builder,
-                       response_body_callback_t body_cb,
-                       response_cleanup_callback_t cleanup, void* data) {
-  builder->build_body = body_cb;
-  builder->cleanup = cleanup;
-  builder->data = data;
-}
-
-void handle_gemini_requests(net_t* net) {
+static void handle_gemini_requests(net_t* net) {
   while (!should_terminate()) {
     if (is_stopped()) {
       wait_until_continue();
@@ -322,3 +320,38 @@ void handle_gemini_requests(net_t* net) {
     close(client);
   }
 }
+static void* gemini_listener_routine(void* ptr) {
+  int port = get_env_int(VAR_GEMINI_PORT, DEFAULT_GEMINI_PORT);
+  cli_options_t* options = (cli_options_t*)ptr;
+
+  // set up socket + TLS
+  net_t* sock;
+  if ((sock = init_tls_socket(port, options->cert_path, options->key_path)) ==
+      NULL) {
+    LOG_ERROR("Failed to initialize socket for Gemini listener");
+  } else {
+    // begin listening for requests
+    LOG("Listening for Gemini requests on port %d...", port);
+    handle_gemini_requests(sock);
+    destroy_socket(sock);
+  }
+
+  return NULL;
+}
+
+void listen_for_gemini_requests(const cli_options_t* options) {
+  pthread_t gemini_thread;
+  pthread_create(&gemini_thread, NULL, gemini_listener_routine, &options);
+  pthread_setname_np(gemini_thread, THREAD_NAME_GEMINI);
+
+  pthread_join(gemini_thread, NULL);
+}
+
+void init_body_builder(response_body_builder_t* builder,
+                       response_body_callback_t body_cb,
+                       response_cleanup_callback_t cleanup, void* data) {
+  builder->build_body = body_cb;
+  builder->cleanup = cleanup;
+  builder->data = data;
+}
+

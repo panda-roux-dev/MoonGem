@@ -15,16 +15,16 @@ set(MOONGEM_EXE moongem)
 set(MOONGEM_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(MOONGEM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(SRC_FILES
-  "${MOONGEM_SRC_DIR}/main.c"
-  "${MOONGEM_SRC_DIR}/buffer.c"
-  "${MOONGEM_SRC_DIR}/script.c"
-  "${MOONGEM_SRC_DIR}/api.c"
-  "${MOONGEM_SRC_DIR}/gemini.c"
-  "${MOONGEM_SRC_DIR}/parse.c"
-  "${MOONGEM_SRC_DIR}/net.c"
-  "${MOONGEM_SRC_DIR}/cert.c"
-  "${MOONGEM_SRC_DIR}/header.c"
-  "${MOONGEM_SRC_DIR}/util.c")
+  "main.c"
+  "buffer.c"
+  "script.c"
+  "api.c"
+  "gemini.c"
+  "parse.c"
+  "net.c"
+  "cert.c"
+  "header.c"
+  "util.c")
 
 set(CMAKE_C_FLAGS_DEBUG
   "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -ggdb")
@@ -34,11 +34,20 @@ set(CMAKE_C_FLAGS_RELEASE
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 find_package(PkgConfig)
-pkg_check_modules(MHD libmicrohttpd)
 find_package(OpenSSL 1.1.1 REQUIRED)
 find_package(Lua 5.4 REQUIRED)
 find_package(LibMagic REQUIRED)
 find_package(Threads REQUIRED)
+
+if (PKG_CONFIG_FOUND)
+  pkg_check_modules(MHD libmicrohttpd)
+endif()
+
+if (NOT DISABLE_HTTP AND MHD_FOUND)
+  list(APPEND SRC_FILES "http.c")
+endif()
+
+list(TRANSFORM SRC_FILES PREPEND "${MOONGEM_SRC_DIR}/")
 
 add_executable(${MOONGEM_EXE} ${SRC_FILES})
 target_link_libraries(${MOONGEM_EXE} PRIVATE

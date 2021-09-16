@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "net.h"
+#include "util.h"
 
 typedef enum callback_result_t { OK, ERROR } callback_result_t;
 
@@ -62,11 +63,11 @@ void init_body_builder(response_body_builder_t* builder,
                        response_body_callback_t body_cb,
                        response_cleanup_callback_t cleanup, void* data);
 
-void handle_gemini_requests(net_t* net);
-
 void set_response_status(response_t* response, int status, const char* msg);
 
 void set_response_body_callback(response_t* response,
                                 response_body_callback_t* cb, void* data);
+
+void listen_for_gemini_requests(const cli_options_t* options);
 
 #endif
