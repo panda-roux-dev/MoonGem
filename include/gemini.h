@@ -68,6 +68,6 @@ void set_response_status(response_t* response, int status, const char* msg);
 void set_response_body_callback(response_t* response,
                                 response_body_callback_t* cb, void* data);
 
-void listen_for_gemini_requests(const cli_options_t* options);
+void listen_for_gemini_requests(cli_options_t* options);
 
 #endif

@@ -14,10 +14,10 @@
 #include "log.h"
 #include "net.h"
 #include "parse.h"
+#include "runtime.h"
 #include "status.h"
 #include "util.h"
 
-#define THREAD_NAME_GEMINI "listener-gemini"
 #define DEFAULT_GEMINI_PORT 1965
 #define VAR_GEMINI_PORT "MOONGEM_GEMINI_PORT"
 #define MIMETYPE_GEMTEXT "text/gemini; encoding=utf-8"
@@ -272,7 +272,8 @@ static void send_body_response(SSL* ssl, size_t path_length, const char* path,
 static void handle_gemini_requests(net_t* net) {
   while (!should_terminate()) {
     if (is_stopped()) {
-      wait_until_continue();
+      sleep(1);
+      continue;
     }
 
     int client;
@@ -321,17 +322,17 @@ static void handle_gemini_requests(net_t* net) {
   }
 }
 static void* gemini_listener_routine(void* ptr) {
-  int port = get_env_int(VAR_GEMINI_PORT, DEFAULT_GEMINI_PORT);
+  pthread_setname_np(pthread_self(), "gemini-listener");
+
   cli_options_t* options = (cli_options_t*)ptr;
 
   // set up socket + TLS
   net_t* sock;
-  if ((sock = init_tls_socket(port, options->cert_path, options->key_path)) ==
-      NULL) {
+  if ((sock = init_tls_socket(options->gemini_port, options)) == NULL) {
     LOG_ERROR("Failed to initialize socket for Gemini listener");
   } else {
     // begin listening for requests
-    LOG("Listening for Gemini requests on port %d...", port);
+    LOG("Listening for Gemini requests on port %d...", options->gemini_port);
     handle_gemini_requests(sock);
     destroy_socket(sock);
   }
@@ -339,11 +340,9 @@ static void* gemini_listener_routine(void* ptr) {
   return NULL;
 }
 
-void listen_for_gemini_requests(const cli_options_t* options) {
+void listen_for_gemini_requests(cli_options_t* options) {
   pthread_t gemini_thread;
-  pthread_create(&gemini_thread, NULL, gemini_listener_routine, &options);
-  pthread_setname_np(gemini_thread, THREAD_NAME_GEMINI);
-
+  pthread_create(&gemini_thread, NULL, gemini_listener_routine, (void*)options);
   pthread_join(gemini_thread, NULL);
 }
 
@@ -354,4 +353,3 @@ void init_body_builder(response_body_builder_t* builder,
   builder->cleanup = cleanup;
   builder->data = data;
 }
-
