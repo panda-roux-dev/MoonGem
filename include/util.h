@@ -4,20 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef struct cli_options_t {
-  char* cert_path;
-  char* key_path;
-} cli_options_t;
-
 typedef struct request_t request_t;
-
-bool should_terminate(void);
-
-bool is_stopped(void);
-
-void install_signal_handler(void);
-
-void wait_until_continue(void);
 
 bool is_dir(const char* path);
 

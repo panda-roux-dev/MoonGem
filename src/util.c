@@ -1,7 +1,6 @@
 #include "util.h"
 
 #include <magic.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,49 +10,6 @@
 #include "net.h"
 
 #define FILE_BUFFER_SIZE 2048
-
-static volatile sig_atomic_t terminate = 0;
-static volatile sig_atomic_t stop = 0;
-
-static void sig_terminate_handler(int sig) { terminate = 1; }
-
-static void sig_stop_handler(int sig) { stop = 1; }
-
-static void sig_kill_handler(int _) { exit(EXIT_FAILURE); }
-
-bool should_terminate(void) { return terminate; }
-
-bool is_stopped(void) { return stop; }
-
-void install_signal_handler(void) {
-  signal(SIGKILL, sig_kill_handler);
-  signal(SIGTERM, sig_terminate_handler);
-  signal(SIGABRT, sig_terminate_handler);
-  signal(SIGINT, sig_terminate_handler);
-  signal(SIGSTOP, sig_stop_handler);
-  signal(SIGTSTP, sig_stop_handler);
-}
-
-void wait_until_continue(void) {
-  sigset_t set;
-  sigemptyset(&set);
-  sigaddset(&set, SIGCONT);
-  sigaddset(&set, SIGKILL);
-  sigaddset(&set, SIGABRT);
-  sigaddset(&set, SIGINT);
-
-  int sig;
-  sigwait(&set, &sig);
-
-  stop = 0;
-  if (sig != SIGCONT) {
-    if (sig != SIGKILL) {
-      terminate = 1;
-    } else {
-      exit(EXIT_FAILURE);
-    }
-  }
-}
 
 bool is_dir(const char* path) { return strrchr(path, '.') == NULL; }
 
