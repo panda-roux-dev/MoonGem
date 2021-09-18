@@ -15,17 +15,15 @@
 static const int OPT_OFF = 0;
 static const int OPT_ON = 1;
 
-static int create_socket(int port) {
-  struct sockaddr_in6 addr;
-  memset(&addr, 0, sizeof(struct sockaddr_in6));
-  addr.sin6_family = AF_INET6;
-  addr.sin6_port = htons(port);
-  addr.sin6_addr = in6addr_any;
+static int create_v4_socket(int port) {
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(struct sockaddr_in));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(port);
+  addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-  int sock = socket(AF_INET6, SOCK_STREAM, 0);
+  int sock = socket(AF_INET, SOCK_STREAM, 0);
 
-  // accept either IPv4 or IPv6
-  setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &OPT_OFF, sizeof(OPT_OFF));
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &OPT_ON, sizeof(OPT_ON));
 
   if (sock < 0) {
@@ -40,6 +38,68 @@ static int create_socket(int port) {
 
   if (listen(sock, 1) < 0) {
     LOG_ERROR("Failed to listen on IPv4 socket");
+    return CREATE_SOCKET_FAILURE;
+  }
+
+  return sock;
+}
+
+static int create_v6_socket(int port) {
+  struct sockaddr_in6 addr;
+  memset(&addr, 0, sizeof(struct sockaddr_in6));
+  addr.sin6_family = AF_INET6;
+  addr.sin6_port = htons(port);
+  addr.sin6_addr = in6addr_any;
+
+  int sock = socket(AF_INET6, SOCK_STREAM, 0);
+
+  // accept only IPv6
+  setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &OPT_ON, sizeof(OPT_ON));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &OPT_ON, sizeof(OPT_ON));
+
+  if (sock < 0) {
+    LOG_ERROR("Failed to create an IPv6 socket");
+    return CREATE_SOCKET_FAILURE;
+  }
+
+  if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    LOG_ERROR("Failed to bind IPv6 socket");
+    return CREATE_SOCKET_FAILURE;
+  }
+
+  if (listen(sock, 1) < 0) {
+    LOG_ERROR("Failed to listen on IPv6 socket");
+    return CREATE_SOCKET_FAILURE;
+  }
+
+  return sock;
+}
+
+static int create_v4v6_socket(int port) {
+  struct sockaddr_in6 addr;
+  memset(&addr, 0, sizeof(struct sockaddr_in6));
+  addr.sin6_family = AF_INET6;
+  addr.sin6_port = htons(port);
+  addr.sin6_addr = in6addr_any;
+
+  int sock = socket(AF_INET6, SOCK_STREAM, 0);
+
+  // accept either IPv4 or IPv6
+  setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &OPT_OFF, sizeof(OPT_OFF));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &OPT_ON, sizeof(OPT_ON));
+
+  if (sock < 0) {
+    LOG_ERROR("Failed to create an IPv4/IPv6 socket");
+    return CREATE_SOCKET_FAILURE;
+  }
+
+  if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    LOG_ERROR("Failed to bind IPv4/IPv6 socket");
+    return CREATE_SOCKET_FAILURE;
+  }
+
+  if (listen(sock, 1) < 0) {
+    LOG_ERROR("Failed to listen on IPv4/IPv6 socket");
     return CREATE_SOCKET_FAILURE;
   }
 
@@ -127,32 +187,28 @@ void log_remote_address(int sock) {
   LOG_NOLF("[%s:%d]", addr_str, port);
 }
 
-net_t* init_socket(int port) {
-  int sock;
-  if ((sock = create_socket(port)) == CREATE_SOCKET_FAILURE) {
-    return NULL;
-  }
-
-  net_t* net = malloc(sizeof(net_t));
-  net->socket = sock;
-  net->ssl_ctx = NULL;
-
-  return net;
-}
-
-net_t* init_tls_socket(int port, const char* cert_path, const char* key_path) {
+net_t* init_tls_socket(int port, const cli_options_t* options) {
   SSL_CTX* ctx;
   if ((ctx = init_ssl_context()) == NULL) {
     return NULL;
   }
 
-  if (set_certs(ctx, cert_path, key_path) == SET_CERTS_FAILURE) {
+  if (set_certs(ctx, options->cert_path, options->key_path) ==
+      SET_CERTS_FAILURE) {
     cleanup_ssl(ctx);
     return NULL;
   }
 
   int sock;
-  if ((sock = create_socket(port)) == CREATE_SOCKET_FAILURE) {
+  if (options->use_ipv4 && options->use_ipv6) {
+    sock = create_v4v6_socket(port);
+  } else if (options->use_ipv4) {
+    sock = create_v4_socket(port);
+  } else if (options->use_ipv6) {
+    sock = create_v6_socket(port);
+  }
+
+  if (sock == CREATE_SOCKET_FAILURE) {
     cleanup_ssl(ctx);
     return NULL;
   }
