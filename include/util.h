@@ -4,15 +4,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef struct request_t request_t;
-
-bool is_dir(const char* path);
+#define CHECK_FREE(obj) \
+  if ((obj) != NULL) free((obj));
 
 int get_env_int(const char* name, int default_value);
-
-size_t response_body_static_file_cb(size_t max, char* buffer, void* data);
-
-void response_static_file_cleanup_cb(void* data);
 
 /*
  * Returns 0 if the operation failed

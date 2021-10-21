@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -12,98 +13,15 @@
 #define CREATE_SOCKET_FAILURE INT_MIN
 #define SET_CERTS_FAILURE INT_MIN
 
-static const int OPT_OFF = 0;
-static const int OPT_ON = 1;
+static struct sockaddr* create_addr(int port, int* addr_size) {
+  struct sockaddr_in6* addr = calloc(1, sizeof(struct sockaddr_in6));
+  addr->sin6_family = AF_INET6;
+  addr->sin6_port = htons(port);
+  addr->sin6_addr = in6addr_any;
 
-static int create_v4_socket(int port) {
-  struct sockaddr_in addr;
-  memset(&addr, 0, sizeof(struct sockaddr_in));
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(port);
-  addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  *addr_size = sizeof(struct sockaddr_in6);
 
-  int sock = socket(AF_INET, SOCK_STREAM, 0);
-
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &OPT_ON, sizeof(OPT_ON));
-
-  if (sock < 0) {
-    LOG_ERROR("Failed to create an IPv4 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-    LOG_ERROR("Failed to bind IPv4 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  if (listen(sock, 1) < 0) {
-    LOG_ERROR("Failed to listen on IPv4 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  return sock;
-}
-
-static int create_v6_socket(int port) {
-  struct sockaddr_in6 addr;
-  memset(&addr, 0, sizeof(struct sockaddr_in6));
-  addr.sin6_family = AF_INET6;
-  addr.sin6_port = htons(port);
-  addr.sin6_addr = in6addr_any;
-
-  int sock = socket(AF_INET6, SOCK_STREAM, 0);
-
-  // accept only IPv6
-  setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &OPT_ON, sizeof(OPT_ON));
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &OPT_ON, sizeof(OPT_ON));
-
-  if (sock < 0) {
-    LOG_ERROR("Failed to create an IPv6 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-    LOG_ERROR("Failed to bind IPv6 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  if (listen(sock, 1) < 0) {
-    LOG_ERROR("Failed to listen on IPv6 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  return sock;
-}
-
-static int create_v4v6_socket(int port) {
-  struct sockaddr_in6 addr;
-  memset(&addr, 0, sizeof(struct sockaddr_in6));
-  addr.sin6_family = AF_INET6;
-  addr.sin6_port = htons(port);
-  addr.sin6_addr = in6addr_any;
-
-  int sock = socket(AF_INET6, SOCK_STREAM, 0);
-
-  // accept either IPv4 or IPv6
-  setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &OPT_OFF, sizeof(OPT_OFF));
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &OPT_ON, sizeof(OPT_ON));
-
-  if (sock < 0) {
-    LOG_ERROR("Failed to create an IPv4/IPv6 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-    LOG_ERROR("Failed to bind IPv4/IPv6 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  if (listen(sock, 1) < 0) {
-    LOG_ERROR("Failed to listen on IPv4/IPv6 socket");
-    return CREATE_SOCKET_FAILURE;
-  }
-
-  return sock;
+  return (struct sockaddr*)addr;
 }
 
 static SSL_CTX* init_ssl_context(void) {
@@ -187,7 +105,7 @@ void log_remote_address(int sock) {
   LOG_NOLF("[%s:%d]", addr_str, port);
 }
 
-net_t* init_tls_socket(int port, const cli_options_t* options) {
+net_t* init_net(const cli_options_t* options) {
   SSL_CTX* ctx;
   if ((ctx = init_ssl_context()) == NULL) {
     return NULL;
@@ -199,33 +117,21 @@ net_t* init_tls_socket(int port, const cli_options_t* options) {
     return NULL;
   }
 
-  int sock;
-  if (options->use_ipv4 && options->use_ipv6) {
-    sock = create_v4v6_socket(port);
-  } else if (options->use_ipv4) {
-    sock = create_v4_socket(port);
-  } else if (options->use_ipv6) {
-    sock = create_v6_socket(port);
-  }
-
-  if (sock == CREATE_SOCKET_FAILURE) {
-    cleanup_ssl(ctx);
-    return NULL;
-  }
-
-  net_t* net = malloc(sizeof(net_t));
-  net->socket = sock;
+  net_t* net = calloc(1, sizeof(net_t));
   net->ssl_ctx = ctx;
+  net->addr = create_addr(options->gemini_port, &net->addr_size);
 
   return net;
 }
 
-void destroy_socket(net_t* net) {
+void destroy_net(net_t* net) {
   if (net == NULL) {
     return;
   }
 
-  close(net->socket);
+  if (net->addr != NULL) {
+    free(net->addr);
+  }
 
   if (net->ssl_ctx != NULL) {
     cleanup_ssl(net->ssl_ctx);

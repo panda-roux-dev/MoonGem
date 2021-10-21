@@ -4,26 +4,27 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-struct doc_state_t;
 typedef struct request_t request_t;
 typedef struct response_t response_t;
+typedef struct script_ctx_t script_ctx_t;
+typedef struct evbuffer evbuffer;
 
 typedef struct parser_t {
-  size_t written;
-  struct doc_state_t* doc_state;
-  const struct request_t* request;
-  struct response_t* response;
+  script_ctx_t* script_ctx;
+  const request_t* request;
+  response_t* response;
   FILE* file;
-  bool processed;
 } parser_t;
+
+int init_parser_regex(void);
+
+void cleanup_parser_regex(void);
 
 parser_t* create_doc_parser(const struct request_t* request,
                             struct response_t* response, FILE* file);
 
+void parse_gemtext_doc(parser_t* parser, struct evbuffer* buffer);
+
 void destroy_doc_parser(parser_t* parser);
-
-size_t response_body_parser_cb(size_t max, char* buffer, void* data);
-
-void response_parser_cleanup_cb(void* data);
 
 #endif

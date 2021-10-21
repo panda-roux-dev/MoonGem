@@ -3,7 +3,7 @@
 
 /*
  * Use this macro to define SHA hashing implementation for a given digest size
- * (e.g. DEFINE_HASH_CAPABILITY(256) for 256-bit SHA hash).
+ * (e.g. DEFINE_HASH_OFSIZE(256) for 256-bit SHA hash).
  */
 
 #define DEFINE_SHA_OFSIZE(digest_size)                                         \

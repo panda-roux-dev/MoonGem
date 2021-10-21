@@ -11,17 +11,8 @@
 #include "log.h"
 #include "status.h"
 
-#define TBL_HEADER "HEAD"
-#define FUNC_LANG "set_lang"
-#define FUNC_INPUT "get_input"
-#define FUNC_INPUT_SENSITIVE "get_sensitive_input"
-#define FUNC_CERT "get_cert"
-#define FUNC_CHECKCERT "has_cert"
-#define FUNC_REDIRECT "redirect"
-#define FUNC_TEMP_REDIRECT "temp_redirect"
-#define FUNC_PERM_REDIRECT "perm_redirect"
+#define LIBRARY_TABLE_NAME "mg"
 
-#define TBL_BODY "BODY"
 #define FUNC_INCLUDE "include"
 #define FUNC_WRITE "write"
 #define FUNC_LINE "line"
@@ -31,6 +22,21 @@
 #define FUNC_BLOCK "block"
 #define FUNC_BEGIN_BLOCK "begin_block"
 #define FUNC_END_BLOCK "end_block"
+
+#define FUNC_LANG "set_lang"
+#define FUNC_INPUT "get_input"
+#define FUNC_INPUT_SENSITIVE "get_sensitive_input"
+#define FUNC_CERT "get_cert"
+#define FUNC_CHECKCERT "has_cert"
+#define FUNC_REDIRECT "redirect"
+#define FUNC_TEMP_REDIRECT "temp_redirect"
+#define FUNC_PERM_REDIRECT "perm_redirect"
+
+typedef struct script_ctx_t {
+  lua_State* L;
+  const request_t* request;
+  response_t* response;
+} script_ctx_t;
 
 /*
  * Forward-declare methods defined in api.c
@@ -67,7 +73,7 @@ int api_body_beginblock(lua_State* L);
 
 int api_body_endblock(lua_State* L);
 
-static void add_body_api_methods(lua_State* L) {
+static void set_api_methods(lua_State* L) {
   luaL_Reg methods[] = {{FUNC_INCLUDE, api_body_include},
                         {FUNC_WRITE, api_body_write},
                         {FUNC_LINE, api_body_line},
@@ -77,83 +83,62 @@ static void add_body_api_methods(lua_State* L) {
                         {FUNC_BLOCK, api_body_block},
                         {FUNC_BEGIN_BLOCK, api_body_beginblock},
                         {FUNC_END_BLOCK, api_body_endblock},
+                        {FUNC_LANG, api_head_set_lang},
+                        {FUNC_INPUT, api_head_get_input},
+                        {FUNC_INPUT_SENSITIVE, api_head_get_input_sensitive},
+                        {FUNC_CERT, api_head_get_cert},
+                        {FUNC_CHECKCERT, api_head_has_cert},
+                        {FUNC_REDIRECT, api_head_temp_redirect},
+                        {FUNC_TEMP_REDIRECT, api_head_temp_redirect},
+                        {FUNC_PERM_REDIRECT, api_head_perm_redirect},
                         {NULL, NULL}};
 
   luaL_newlib(L, methods);
-
-  lua_setglobal(L, TBL_BODY);
+  lua_setglobal(L, LIBRARY_TABLE_NAME);
 }
 
-static void add_header_api_methods(lua_State* L) {
-  luaL_Reg methods[] = {
-      {FUNC_LANG, api_head_set_lang},
-      {FUNC_INPUT, api_head_get_input},
-      {FUNC_INPUT_SENSITIVE, api_head_get_input_sensitive},
-      {FUNC_CERT, api_head_get_cert},
-      {FUNC_CHECKCERT, api_head_has_cert},
-      {FUNC_REDIRECT, api_head_temp_redirect},
-      {FUNC_TEMP_REDIRECT, api_head_temp_redirect},
-      {FUNC_PERM_REDIRECT, api_head_perm_redirect},
-      {NULL, NULL},
-  };
+static void set_script_globals(script_ctx_t* ctx) {
+  lua_State* L = ctx->L;
+  response_t* response = ctx->response;
+  const request_t* request = ctx->request;
 
-  luaL_newlib(L, methods);
-
-  lua_setglobal(L, TBL_HEADER);
-}
-
-static void add_response_ptr(lua_State* L, int index, response_t* response) {
   lua_pushlightuserdata(L, response);
-  lua_setfield(L, index - 1, FLD_RESPONSE_PTR);
-}
+  lua_setfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
 
-static void add_request_ptr(lua_State* L, int index, const request_t* request) {
   lua_pushlightuserdata(L, (request_t*)request);
-  lua_setfield(L, index - 1, FLD_REQUEST_PTR);
-}
+  lua_setfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
 
-static void init_scripting_api(lua_State* L, const request_t* request,
-                               response_t* response) {
-  luaL_openlibs(L);
-
-  // add global response table
-  lua_newtable(L);
-  add_response_ptr(L, -1, response);
-  lua_setglobal(L, TBL_RESPONSE);
-
-  // add global request table
-  lua_newtable(L);
-  add_request_ptr(L, -1, request);
-  lua_setglobal(L, TBL_REQUEST);
+  lua_pushinteger(L, 0);
+  lua_setfield(L, LUA_REGISTRYINDEX, FLD_SIZE);
 
   // set the PATH global variable
-  lua_pushstring(L, request->path + 1);
+  lua_pushstring(L, request->uri->path);
   lua_setglobal(L, FLD_PATH);
 
   // add user input as a global variable, if present
-  if (request->input != NULL) {
-    lua_pushstring(L, request->input);
+  if (request->uri->input != NULL) {
+    lua_pushstring(L, request->uri->input);
     lua_setglobal(L, FLD_INPUT);
   }
-
-  add_body_api_methods(L);
-  add_header_api_methods(L);
 }
 
-static void init_response_buffer(lua_State* L) {
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_pushliteral(L, "\0");
-  lua_setfield(L, -2, FLD_BUFFER);
-  lua_pop(L, 1);
+static void set_response_buffer(lua_State* L, struct evbuffer* buffer) {
+  lua_pushlightuserdata(L, (void*)buffer);
+  lua_setfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
 }
 
-static void add_package_path(lua_State* L, const char* path) {
+static void add_package_path(script_ctx_t* ctx) {
+  lua_State* L = ctx->L;
+  const char* path = ctx->request->uri->path;
+
   if (path == NULL) {
     return;
   }
 
+  /*
   // skip the first forward-slash
   ++path;
+  */
 
   // add the request path to package.path
   lua_getglobal(L, "package");
@@ -171,20 +156,24 @@ static void add_package_path(lua_State* L, const char* path) {
   lua_setfield(L, -2, "path");
 }
 
-script_ctx_t* init_script(const request_t* request, response_t* response) {
-  script_ctx_t* ctx = malloc(sizeof(script_ctx_t));
+script_ctx_t* create_script_ctx(const request_t* request,
+                                response_t* response) {
+  script_ctx_t* ctx = calloc(1, sizeof(script_ctx_t));
   if (ctx == NULL) {
     LOG_ERROR("Failed to allocate space for the script context");
     return NULL;
   }
 
-  ctx->result = NULL;
-  ctx->result_len = 0;
-  ctx->language = NULL;
+  lua_State* L = luaL_newstate();
 
-  ctx->L = luaL_newstate();
-  init_scripting_api(ctx->L, request, response);
-  add_package_path(ctx->L, request->path);
+  ctx->L = L;
+  ctx->request = request;
+  ctx->response = response;
+
+  luaL_openlibs(L);
+  add_package_path(ctx);
+  set_script_globals(ctx);
+  set_api_methods(L);
 
   return ctx;
 }
@@ -195,51 +184,30 @@ void destroy_script(script_ctx_t* ctx) {
       lua_close(ctx->L);
     }
 
-    if (ctx->language != NULL) {
-      free(ctx->language);
-    }
-
-    if (ctx->result != NULL) {
-      free(ctx->result);
-    }
-
     free(ctx);
   }
 }
 
-int run_script(script_ctx_t* ctx, char* contents) {
+script_result_t exec_script(script_ctx_t* ctx, char* script, size_t script_len,
+                            struct evbuffer* output) {
   lua_State* L = ctx->L;
 
-  init_response_buffer(L);
+  set_response_buffer(L, output);
 
-  // free output buffer allocation from prior run if need be
-  if (ctx->result != NULL) {
-    free(ctx->result);
-    ctx->result = NULL;
-  }
+  script = strndup(script, script_len);
 
-  if (luaL_dostring(L, contents) != LUA_OK) {
+  LOG_DEBUG("Script: %s", script);
+
+  script_result_t result = SCRIPT_OK;
+  if (luaL_dostring(L, script) != LUA_OK) {
     LOG_ERROR("Error running Lua script: %s", lua_tostring(L, -1));
-    return RUN_SCRIPT_FAILURE;
+    result = SCRIPT_ERROR;
   }
 
-  // clear stack
-  lua_pop(L, lua_gettop(L));
+  // at this point, any resulting text produced by the script is contained in
+  // the results buffer
 
-  // get response table
-  lua_getglobal(L, TBL_RESPONSE);
-  if (lua_isnoneornil(L, -1)) {
-    return RUN_SCRIPT_FAILURE;
-  }
+  free(script);
 
-  // get buffer field
-  lua_getfield(L, -1, FLD_BUFFER);
-  if (!lua_isnoneornil(L, -1) && lua_isstring(L, -1)) {
-    const char* buffer = lua_tolstring(L, -1, &ctx->result_len);
-    ctx->result = strndup(buffer, ctx->result_len);
-  }
-
-  lua_pop(L, lua_gettop(L));
-
-  return 0;
+  return result;
 }

@@ -32,12 +32,11 @@ static void set_interrupt_response(response_t* response, int status,
 }
 
 int api_head_set_lang(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
-  const char* lang = luaL_checkstring(L, 2);
+  const char* lang = luaL_checkstring(L, 1);
 
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_RESPONSE_PTR);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
 
   // free the previous value if one exists
@@ -51,19 +50,18 @@ int api_head_set_lang(lua_State* L) {
 }
 
 int api_head_get_input(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
   lua_getglobal(L, FLD_INPUT);
   if (lua_isnoneornil(L, -1)) {
-    lua_getglobal(L, TBL_RESPONSE);
-    lua_getfield(L, -1, FLD_RESPONSE_PTR);
+    lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
     response_t* response = (response_t*)lua_touserdata(L, -1);
 
-    if (lua_isnoneornil(L, 2)) {
+    if (lua_isnoneornil(L, 1)) {
       set_interrupt_response(response, STATUS_INPUT,
                              DEFAULT_MSG_INPUT_REQUIRED);
     } else {
-      const char* prompt = luaL_checkstring(L, 2);
+      const char* prompt = luaL_checkstring(L, 1);
       set_interrupt_response(response, STATUS_INPUT, prompt);
     }
 
@@ -74,19 +72,18 @@ int api_head_get_input(lua_State* L) {
 }
 
 int api_head_get_input_sensitive(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
   lua_getglobal(L, FLD_INPUT);
   if (lua_isnoneornil(L, -1)) {
-    lua_getglobal(L, TBL_RESPONSE);
-    lua_getfield(L, -1, FLD_RESPONSE_PTR);
+    lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
     response_t* response = (response_t*)lua_touserdata(L, -1);
 
-    if (lua_isnoneornil(L, 2)) {
+    if (lua_isnoneornil(L, 1)) {
       set_interrupt_response(response, STATUS_SENSITIVE_INPUT,
                              DEFAULT_MSG_INPUT_REQUIRED);
     } else {
-      const char* prompt = luaL_checkstring(L, 2);
+      const char* prompt = luaL_checkstring(L, 1);
       set_interrupt_response(response, STATUS_SENSITIVE_INPUT, prompt);
     }
 
@@ -97,39 +94,35 @@ int api_head_get_input_sensitive(lua_State* L) {
 }
 
 int api_head_temp_redirect(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
-  const char* uri = luaL_checkstring(L, 2);
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_RESPONSE_PTR);
+  const char* uri = luaL_checkstring(L, 1);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
   set_interrupt_response(response, STATUS_TEMPORARY_REDIRECT, uri);
   return 0;
 }
 
 int api_head_perm_redirect(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
-  const char* uri = luaL_checkstring(L, 2);
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_RESPONSE_PTR);
+  const char* uri = luaL_checkstring(L, 1);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
   set_interrupt_response(response, STATUS_PERMANENT_REDIRECT, uri);
   return 0;
 }
 
 int api_head_get_cert(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
-  lua_getglobal(L, TBL_REQUEST);
-  lua_getfield(L, -1, FLD_REQUEST_PTR);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
   request_t* request = (request_t*)lua_touserdata(L, -1);
 
   client_cert_t* cert = request->cert;
   if (!cert->initialized) {
     // no cert provided; request one from the client
-    lua_getglobal(L, TBL_RESPONSE);
-    lua_getfield(L, -1, FLD_RESPONSE_PTR);
+    lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
     response_t* response = (response_t*)lua_touserdata(L, -1);
 
     if (lua_isnoneornil(L, 2)) {
@@ -157,8 +150,7 @@ int api_head_get_cert(lua_State* L) {
 }
 
 int api_head_has_cert(lua_State* L) {
-  lua_getglobal(L, TBL_REQUEST);
-  lua_getfield(L, -1, FLD_REQUEST_PTR);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
   request_t* request = (request_t*)lua_touserdata(L, -1);
 
   lua_pushboolean(L, request->cert->initialized);
@@ -167,9 +159,9 @@ int api_head_has_cert(lua_State* L) {
 }
 
 int api_body_include(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
-  const char* path = luaL_checkstring(L, 2);
+  const char* path = luaL_checkstring(L, 1);
 
   char* contents = NULL;
   size_t file_len = read_file(path, &contents);
@@ -180,13 +172,9 @@ int api_body_include(lua_State* L) {
   }
 
   if (file_len > 0) {
-    lua_getglobal(L, TBL_RESPONSE);
-    lua_getfield(L, -1, FLD_BUFFER);
-
-    lua_pushfstring(L, "%s" NEWLINE, contents);
-
-    lua_concat(L, 2);
-    lua_setfield(L, -2, FLD_BUFFER);
+    lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+    struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
+    evbuffer_add_printf(buffer, "%s" NEWLINE, contents);
   }
 
   free(contents);
@@ -195,148 +183,125 @@ int api_body_include(lua_State* L) {
 }
 
 int api_body_write(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
-  const char* text = luaL_checkstring(L, 2);
+  const char* text = luaL_checkstring(L, 1);
 
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_BUFFER);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+  struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 
-  lua_pushstring(L, text);
-
-  lua_concat(L, 2);
-  lua_setfield(L, -2, FLD_BUFFER);
+  // TODO: find out why there's a memory error here
+  evbuffer_add_printf(buffer, "%s", text);
 
   return 0;
 }
 
 int api_body_line(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_BUFFER);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+  struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 
-  const char* text = lua_tostring(L, 2);
+  const char* text = lua_tostring(L, 1);
   if (text != NULL) {
-    lua_pushfstring(L, "%s" NEWLINE, text);
+    evbuffer_add_printf(buffer, "%s" NEWLINE, text);
   } else {
-    lua_pushliteral(L, NEWLINE);
+    evbuffer_add_printf(buffer, "%s", NEWLINE);
   }
-
-  lua_concat(L, 2);
-  lua_setfield(L, -2, FLD_BUFFER);
 
   return 0;
 }
 
 int api_body_link(lua_State* L) {
-  lua_settop(L, 3);
+  lua_settop(L, 2);
 
-  const char* url = luaL_checkstring(L, 2);
+  const char* url = luaL_checkstring(L, 1);
 
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_BUFFER);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+  struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 
-  if (!lua_isstring(L, 3)) {
+  if (!lua_isstring(L, 2)) {
     // URL only, no alt-text
 
-    lua_pushfstring(L, LINK_TOKEN " %s" NEWLINE, url);
+    evbuffer_add_printf(buffer, LINK_TOKEN " %s" NEWLINE, url);
   } else {
     // URL + alt-text
 
-    const char* alt = luaL_checkstring(L, 3);
-    lua_pushfstring(L, LINK_TOKEN " %s %s" NEWLINE, url, alt);
+    const char* alt = luaL_checkstring(L, 2);
+    evbuffer_add_printf(buffer, LINK_TOKEN " %s %s" NEWLINE, url, alt);
   }
-
-  lua_concat(L, 2);
-  lua_setfield(L, -2, FLD_BUFFER);
 
   return 0;
 }
 
 int api_body_heading(lua_State* L) {
-  lua_settop(L, 3);
+  lua_settop(L, 2);
 
-  const char* text = luaL_checkstring(L, 2);
+  const char* text = luaL_checkstring(L, 1);
 
-  int level = luaL_optinteger(L, 3, 1);
+  int level = luaL_optinteger(L, 2, 1);
 
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_BUFFER);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+  struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 
   for (int i = 0; i < level; ++i) {
-    lua_pushliteral(L, "#");
+    evbuffer_add(buffer, HEADER_TOKEN, sizeof(HEADER_TOKEN) - 1);
   }
 
-  lua_pushfstring(L, " %s" NEWLINE, text);
-
-  lua_concat(L, level + 2);
-  lua_setfield(L, -2, FLD_BUFFER);
+  evbuffer_add_printf(buffer, " %s" NEWLINE, text);
 
   return 0;
 }
 
 int api_body_quote(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
   const char* text = luaL_checkstring(L, 2);
 
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_BUFFER);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+  struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 
-  lua_pushfstring(L, QUOTE_TOKEN " %s" NEWLINE, text);
-
-  lua_concat(L, 2);
-  lua_setfield(L, -2, FLD_BUFFER);
+  evbuffer_add_printf(buffer, QUOTE_TOKEN " %s" NEWLINE, text);
 
   return 0;
 }
 
 int api_body_block(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
   const char* text = luaL_checkstring(L, 2);
 
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_BUFFER);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+  struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 
-  lua_pushfstring(L, BLOCK_TOKEN NEWLINE "%s" NEWLINE BLOCK_TOKEN NEWLINE,
-                  text);
-
-  lua_concat(L, 2);
-  lua_setfield(L, -2, FLD_BUFFER);
+  evbuffer_add_printf(
+      buffer, BLOCK_TOKEN NEWLINE "%s" NEWLINE BLOCK_TOKEN NEWLINE, text);
 
   return 0;
 }
 
 int api_body_beginblock(lua_State* L) {
-  lua_settop(L, 2);
+  lua_settop(L, 1);
 
   const char* alt = luaL_checkstring(L, 2);
 
-  lua_getglobal(L, TBL_REQUEST);
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_BUFFER);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+  struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 
   if (alt == NULL) {
-    lua_pushliteral(L, BLOCK_TOKEN NEWLINE);
+    evbuffer_add(buffer, BLOCK_TOKEN NEWLINE, sizeof(BLOCK_TOKEN NEWLINE) - 1);
   } else {
-    lua_pushfstring(L, BLOCK_TOKEN "%s" NEWLINE, alt);
+    evbuffer_add_printf(buffer, BLOCK_TOKEN "%s" NEWLINE, alt);
   }
-
-  lua_concat(L, 2);
-  lua_setfield(L, -2, FLD_BUFFER);
 
   return 0;
 }
 
 int api_body_endblock(lua_State* L) {
-  lua_getglobal(L, TBL_RESPONSE);
-  lua_getfield(L, -1, FLD_BUFFER);
-  lua_pushliteral(L, BLOCK_TOKEN NEWLINE);
-  lua_concat(L, 2);
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
+  struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 
-  lua_setfield(L, -2, FLD_BUFFER);
+  evbuffer_add(buffer, BLOCK_TOKEN NEWLINE, sizeof(BLOCK_TOKEN NEWLINE) - 1);
 
   return 0;
 }

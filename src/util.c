@@ -11,8 +11,6 @@
 
 #define FILE_BUFFER_SIZE 2048
 
-bool is_dir(const char* path) { return strrchr(path, '.') == NULL; }
-
 int get_env_int(const char* name, int default_value) {
   char* str = getenv(name);
   int value = default_value;
@@ -106,18 +104,4 @@ char* get_mimetype(const char* path) {
   char* result = strdup(magic_file(magic, path));
   magic_close(magic);
   return result;
-}
-
-size_t response_body_static_file_cb(size_t max, char* buffer, void* data) {
-  if (data == NULL) {
-    return 0;
-  }
-
-  return fread(buffer, sizeof(char), max, (FILE*)data);
-}
-
-void response_static_file_cleanup_cb(void* data) {
-  if (data != NULL) {
-    fclose((FILE*)data);
-  }
 }

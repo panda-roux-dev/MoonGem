@@ -4,9 +4,6 @@ project(moongem VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# pull in extra CMake modules
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
 # default to Release-mode
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type specified, defaulting to Release")
@@ -21,8 +18,6 @@ set(MOONGEM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(SRC_FILES
   "main.c"
   "options.c"
-  "runtime.c"
-  "buffer.c"
   "script.c"
   "api.c"
   "gemini.c"
@@ -30,6 +25,7 @@ set(SRC_FILES
   "net.c"
   "cert.c"
   "header.c"
+  "uri.c"
   "util.c")
 
 # set default compile flags
@@ -48,16 +44,12 @@ add_subdirectory(${MOONGEM_LIB_DIR})
 find_package(PkgConfig)
 find_package(OpenSSL 1.1.1 REQUIRED)
 find_package(Lua 5.4 REQUIRED)
-find_package(LibMagic REQUIRED)
-find_package(Threads REQUIRED)
 
 if (PKG_CONFIG_FOUND)
-  pkg_check_modules(MHD libmicrohttpd)
-endif()
-
-# enable the HTTP feature if it was not disabled
-if (NOT DISABLE_HTTP AND MHD_FOUND)
-  list(APPEND SRC_FILES "http.c")
+  pkg_check_modules(EVT libevent_core)
+  pkg_check_modules(EVT_SSL libevent_openssl)
+  pkg_check_modules(PCRE libpcre2-posix)
+  pkg_check_modules(MAGIC libmagic)
 endif()
 
 # prepend the 'src' directory name to each of the source files
@@ -67,32 +59,24 @@ list(TRANSFORM SRC_FILES PREPEND "${MOONGEM_SRC_DIR}/")
 add_executable(${MOONGEM_EXE} ${SRC_FILES})
 target_link_libraries(${MOONGEM_EXE} PRIVATE
   ${ARGPARSE_LIBRARIES}
-  ${LIBMAGIC_LIBRARIES}
+  ${MAGIC_LIBRARIES}
   ${LUA_LIBRARIES}
   ${OPENSSL_LIBRARIES}
-  ${CMAKE_THREAD_LIBS_INIT})
+  ${CMAKE_THREAD_LIBS_INIT}
+  ${EVT_LIBRARIES}
+  ${EVT_SSL_LIBRARIES}
+  ${PCRE_LIBRARIES})
 target_include_directories(${MOONGEM_EXE} PRIVATE
   ${MOONGEM_INCLUDE_DIR}
   ${ARGPARSE_INCLUDE_DIR}
-  ${LIBMAGIC_INCLUDES}
+  ${MAGIC_INCLUDES}
   ${LUA_INCLUDE_DIR}
-  ${OPENSSL_INCLUDE_DIR})
+  ${OPENSSL_INCLUDE_DIR}
+  ${EVT_INCLUDE_DIRS}
+  ${EVT_SSL_INCLUDE_DIRS}
+  ${PCRE_INCLUDE_DIRS})
 
 install(TARGETS ${MOONGEM_EXE} DESTINATION bin)
-
-if (NOT DISABLE_HTTP)
-  if (MHD_FOUND)
-    # extra stuff for libmicrohttpd
-
-    message(STATUS "The HTTP proxying feature is enabled; define DISABLE_HTTP if you would like to disable it.")
-    target_link_libraries(${MOONGEM_EXE} PRIVATE ${MHD_LIBRARIES})
-    target_include_directories(${MOONGEM_EXE} PRIVATE ${MHD_INCLUDE_DIRS})
-    target_compile_options(${MOONGEM_EXE} PRIVATE ${MHD_CFLAGS_OTHER})
-    target_compile_definitions(${MOONGEM_EXE} PRIVATE HTTP_PROXY_ENABLED=1)
-  else()
-    message(STATUS "libmicrohttpd was not found, so HTTP proxying will be unavailable.")
-  endif()
-endif()
 
 # optionally disable logging to reduce the binary size
 if(DISABLE_LOGGING)

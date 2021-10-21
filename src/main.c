@@ -4,16 +4,8 @@
 #include "gemini.h"
 #include "log.h"
 #include "options.h"
-#include "runtime.h"
-
-// if HTTP proxying isn't disabled, then include the appropriate header and
-// execute any HTTP-related logic
-#ifndef DISABLE_HTTP
-#include "http.h"
-#define HTTP(expr) expr
-#else
-#define HTTP(expr) ((void)0)
-#endif
+#include "parse.h"
+#include "uri.h"
 
 int main(int argc, const char** argv) {
   cli_options_t* options = parse_options(argc, argv);
@@ -31,17 +23,22 @@ int main(int argc, const char** argv) {
     chdir(options->root);
   }
 
-  // handle signals
-  begin_signal_handler();
+  // compile the URI regex
+  if (init_uri_regex() != 0) {
+    return EXIT_FAILURE;
+  }
 
-  HTTP(http_t* http = listen_for_http_requests(options));
+  // compile the parser regex
+  if (init_parser_regex() != 0) {
+    return EXIT_FAILURE;
+  }
 
   // control flow blocks here until the gemini thread terminates
   listen_for_gemini_requests(options);
 
-  HTTP(destroy_http(http));
-
   destroy_options(options);
+  cleanup_uri_regex();
+  cleanup_parser_regex();
 
   return EXIT_SUCCESS;
 }

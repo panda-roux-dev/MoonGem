@@ -38,6 +38,7 @@ size_t extract_input(const char* request, char* input) {
   return input_len;
 }
 
+// TODO: use regex for this like a sane person
 int extract_path(char* request, char* buffer, size_t* length) {
   // first check that the request body begins with the URL scheme
   if (strstr(request, URL_SCHEME) != request) {
