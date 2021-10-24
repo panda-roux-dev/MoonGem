@@ -8,9 +8,9 @@
 #include "hashdef.h"
 #include "log.h"
 
-DEFINE_SHA_OFSIZE(256)
+#define MODULUS_BUFFER_SIZE 512  // (4096 / 8)
 
-static int client_cert_index = 0;
+DEFINE_SHA_OFSIZE(256)
 
 void destroy_client_cert(client_cert_t* cert) {
   if (cert != NULL) {
@@ -22,23 +22,26 @@ void destroy_client_cert(client_cert_t* cert) {
   }
 }
 
-int get_client_cert_index(void) { return client_cert_index; }
-
-unsigned char* get_modulus_from_x509(X509* certificate, size_t* len) {
+static size_t get_modulus_from_x509(X509* certificate, unsigned char* buffer) {
   EVP_PKEY* key = X509_get_pubkey(certificate);
 
   struct rsa_st* rsa = EVP_PKEY_get1_RSA(key);
+  if (rsa == NULL) {
+    EVP_PKEY_free(key);
+    return 0;
+  }
+
   const BIGNUM* modulus = RSA_get0_n(rsa);
 
   // store key contents in a buffer
-  *len = BN_num_bytes(modulus);
-  unsigned char* buffer = malloc(sizeof(unsigned char) * (*len));
+  size_t length;
+  length = BN_num_bytes(modulus);
   BN_bn2bin(modulus, buffer);
 
   RSA_free(rsa);
   EVP_PKEY_free(key);
 
-  return buffer;
+  return length;
 }
 
 unsigned int get_x509_expiration(X509* certificate) {
@@ -60,7 +63,7 @@ int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
       X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
 
   X509* x509 = X509_STORE_CTX_get0_cert(ctx);
-  client_cert_t* cert = (client_cert_t*)SSL_get_ex_data(ssl, client_cert_index);
+  client_cert_t* cert = (client_cert_t*)SSL_get_ex_data(ssl, CLIENT_CERT_INDEX);
 
   if (cert != NULL && !cert->initialized) {
     // set this flag so that we don't perform this logic multiple times (leading
@@ -71,11 +74,15 @@ int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
     // so we have to do this
     cert->initialized = true;
 
-    size_t pubkey_len = 0;
+    unsigned char modulus[MODULUS_BUFFER_SIZE];
+    size_t mod_len = get_modulus_from_x509(x509, &modulus[0]);
+    if (mod_len == 0) {
+      // couldn't get the certificate modulus; nothing left to do
+      return 0;
+    }
+
     hash_buffer_256_t hash;
-    unsigned char* modulus = get_modulus_from_x509(x509, &pubkey_len);
-    size_t hash_len = compute_sha256_hash(&hash, modulus, pubkey_len);
-    free(modulus);
+    size_t hash_len = compute_sha256_hash(&hash, modulus, mod_len);
 
     // allocate space for each hash byte to be illustrated as 2 characters, plus
     // a null terminator
@@ -86,9 +93,12 @@ int handle_client_certificate(int preverify_ok, X509_STORE_CTX* ctx) {
       return 0;
     }
 
+    char* hex = cert->fingerprint;
     for (int i = 0; i < hash_len; ++i) {
-      snprintf(&cert->fingerprint[i], 2, "%02x", hash.data[i]);
+      hex += sprintf(hex, "%02x", hash.data[i]);
     }
+
+    LOG_DEBUG("Client certificate fingerprint: %s", cert->fingerprint);
 
     cert->fingerprint[fingerprint_len] = '\0';
     cert->not_after = get_x509_expiration(x509);

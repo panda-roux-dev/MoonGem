@@ -8,7 +8,7 @@
 
 #define DEFINE_SHA_OFSIZE(digest_size)                                         \
   typedef struct {                                                             \
-    unsigned char data[digest_size / 8];                                       \
+    unsigned char data[(digest_size) / 8];                                       \
   } hash_buffer_##digest_size##_t;                                             \
                                                                                \
   size_t compute_sha##digest_size##_hash(hash_buffer_##digest_size##_t* buf,   \

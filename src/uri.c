@@ -12,7 +12,7 @@
 #define URI_PATTERN                                        \
   "(?:(?:([a-z]+):\\/\\/"                                  \
   ")?([a-z0-9]{1}[a-z0-9.\\-]+)(?::([0-9]{2,5}))?)?(?:\\/" \
-  "([^\\r\\n\\?]*[^\\r\\n\\?\\/])\\/?)?(?:\\?([^\\r\\n\\?]+))?"
+  "([^\\r\\n\\?]*[^\\r\\n\\?\\/])\\/?)?(?:(?:\\/)?\\?([^\\r\\n\\?]+))?"
 
 #define URI_PART_COUNT 6
 #define URI_SCHEME 1
@@ -54,7 +54,7 @@ static char* extract_part(regmatch_t* match, const char* buf) {
 static void standardize_path(char** path) {
   // if empty path, append default document
   if (*path == NULL) {
-    LOG("Empty path; appending default document");
+    LOG_DEBUG("Empty path; appending default document");
     *path = strdup(DEFAULT_DOCUMENT);
     return;
   }
@@ -116,6 +116,8 @@ uri_t* create_uri(const char* buf) {
       break;
   }
 
+  LOG_DEBUG("Request: %s", buf);
+
   uri_t* uri = malloc(sizeof(uri_t));
   uri->scheme = extract_part(&matches[URI_SCHEME], buf);
   uri->host = extract_part(&matches[URI_HOST], buf);
@@ -132,6 +134,12 @@ uri_t* create_uri(const char* buf) {
   }
 
   uri->type = path_is_gmi(uri->path) ? URI_TYPE_GEMTEXT : URI_TYPE_FILE;
+
+  LOG_DEBUG("Scheme: %s", uri->scheme);
+  LOG_DEBUG("Host:   %s", uri->host);
+  LOG_DEBUG("Port:   %s", uri->port);
+  LOG_DEBUG("Path:   %s", uri->path);
+  LOG_DEBUG("Input:  %s", uri->input);
 
   return uri;
 }

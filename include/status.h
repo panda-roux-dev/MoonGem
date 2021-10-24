@@ -21,4 +21,14 @@
 
 #define STATUS_DEFAULT STATUS_SUCCESS
 
+#define META_INPUT "Input Required"
+#define META_SENSITIVE_INPUT "Input Required"
+#define META_SERVER_UNAVAILABLE "Server Unavailable"
+#define META_CGI_ERROR "Script Error"
+#define META_NOT_FOUND "Not Found"
+#define META_GONE "Gone"
+#define META_BAD_REQUEST "Bad Request"
+#define META_CLIENT_CERTIFICATE_REQUIRED "Certificate Required"
+#define META_CERTIFICATE_NOT_AUTHORIZED "Not Authorized"
+
 #endif

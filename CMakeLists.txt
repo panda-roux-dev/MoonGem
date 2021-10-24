@@ -24,7 +24,6 @@ set(SRC_FILES
   "parse.c"
   "net.c"
   "cert.c"
-  "header.c"
   "uri.c"
   "util.c")
 

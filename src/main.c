@@ -13,10 +13,12 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
-  if (!check_privileges()) {
-    // don't run if we can't drop privileges
+#ifndef MOONGEM_ALLOW_ROOT
+  if (getuid() == 0) {
+    LOG_ERROR("MoonGem should not be run as root!  Terminating...");
     return EXIT_FAILURE;
   }
+#endif
 
   // move the working directory to the user-defined root path if provided
   if (options->root != NULL) {

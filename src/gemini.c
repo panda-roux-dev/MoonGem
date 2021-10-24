@@ -1,6 +1,6 @@
 #include "gemini.h"
 
-#define _GNU_SOURCE
+#define GNU_SOURCE
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -8,15 +8,14 @@
 #include <event2/event.h>
 #include <event2/listener.h>
 #include <event2/util.h>
+#include <magic.h>
 #include <openssl/ssl.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #include "cert.h"
-#include "header.h"
 #include "log.h"
 #include "net.h"
 #include "parse.h"
@@ -26,17 +25,26 @@
 
 #define CRLF "\r\n"
 #define TAG_DELIMITER ";"
+#define MAX_URL_LENGTH 1024
 #define MIMETYPE_GEMTEXT "text/gemini; encoding=utf-8"
-#define DEFAULT_FILE_MAX_WRITE 1 << 14
+#define DEFAULT_MIMETYPE "application/octet-stream"
+
+#define SIGNAL_HANDLERS_COUNT 4
+
+static struct magic_set* magic;
 
 typedef struct context_t {
-  request_t request;
-  response_t response;
-  FILE* file;
+  gemini_state_t gemini;
+  file_info_t file;
+  int chunk_size;
   struct evbuffer* out;
   SSL* ssl;
-  bool error;
 } context_t;
+
+typedef struct request_common_state_t {
+  SSL_CTX* ssl_ctx;
+  cli_options_t* options;
+} request_common_state_t;
 
 static client_cert_t* create_client_cert() {
   client_cert_t* cert = malloc(sizeof(client_cert_t));
@@ -58,8 +66,7 @@ static void event_cb(struct bufferevent* bev, short evt, void* data) {
 
     context_t* ctx = (context_t*)data;
     if (ctx != NULL) {
-      request_t* req = &ctx->request;
-      response_t* res = &ctx->response;
+      request_t* req = &ctx->gemini.request;
 
       if (req->cert != NULL) {
         destroy_client_cert(req->cert);
@@ -69,17 +76,11 @@ static void event_cb(struct bufferevent* bev, short evt, void* data) {
         destroy_uri(req->uri);
       }
 
-      CHECK_FREE(res->language);
-      CHECK_FREE(res->meta);
-      CHECK_FREE(res->mimetype);
-
       evbuffer_free(ctx->out);
 
-      /*
-      if (ctx->file != NULL) {
-        fclose(ctx->file);
+      if (ctx->file.ptr != NULL) {
+        fclose(ctx->file.ptr);
       }
-      */
 
       free(ctx);
     }
@@ -93,128 +94,191 @@ static void end_response_cb(struct bufferevent* bev, void* data) {
   bufferevent_trigger_event(bev, BEV_EVENT_EOF | BEV_EVENT_WRITING, 0);
 }
 
-static void write_header(struct bufferevent* bev, context_t* ctx) {
-  request_t* req = &ctx->request;
-  response_t* res = &ctx->response;
+static void write_header(context_t* ctx) {
+  gemini_state_t* gemini = &ctx->gemini;
+  response_t* res = &gemini->response;
   struct evbuffer* out = ctx->out;
 
   evbuffer_add_printf(out, "%d", res->status);
 
   // write meta
   bool has_tags = false;
-  if (res->meta != NULL) {
-    evbuffer_add_printf(out, " %s", res->meta);
+  if (response_has_meta(res)) {
+    evbuffer_add_printf(out, " %s", &res->meta[0]);
     has_tags = true;
   }
 
-  if (!ctx->error) {
-    // write mimetype
-    if (res->mimetype != NULL) {
-      if (has_tags) {
-        evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
-      }
-
-      evbuffer_add_printf(out, " %s", res->mimetype);
-      has_tags = true;
+  // write mimetype
+  if (response_has_mime(res)) {
+    if (has_tags) {
+      evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
     }
 
-    // write language
-    if (res->language != NULL) {
-      if (has_tags) {
-        evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
-      }
+    evbuffer_add_printf(out, " %s", &res->mimetype[0]);
+    has_tags = true;
+  }
 
-      evbuffer_add_printf(out, " lang=%s", res->language);
+  // write language
+  if (response_has_lang(res)) {
+    if (has_tags) {
+      evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
     }
+
+    evbuffer_add_printf(out, " lang=%s", &res->language[0]);
   }
 
   // terminate header
   evbuffer_add(out, CRLF, sizeof(CRLF) - 1);
+}
 
-  char header[1024] = {0};
-  evbuffer_copyout(out, &header[0], sizeof(header) - 1);
-  LOG_DEBUG("%s", &header[0]);
+static void serve_static_file_cb(struct bufferevent* bev, void* data) {
+  context_t* ctx = (context_t*)data;
+  file_info_t* file = &ctx->file;
+
+  size_t remaining = ctx->file.size - ctx->file.offset;
+
+  // while there remains data to be buffered, load another block
+  if (remaining > 0) {
+    size_t length = remaining > ctx->chunk_size ? ctx->chunk_size : remaining;
+    struct evbuffer_file_segment* segment =
+        evbuffer_file_segment_new(file->fd, file->offset, length, 0);
+    evbuffer_add_file_segment(ctx->out, segment, 0, -1);
+    evbuffer_file_segment_free(segment);
+
+    LOG_DEBUG("Buffering %zu bytes (%zu/%ld)", length,
+              ctx->file.offset + length, ctx->file.size);
+
+    file->offset += length;
+
+    bufferevent_write_buffer(bev, ctx->out);
+  } else {
+    // the entire file has been sent
+    bufferevent_setcb(bev, NULL, end_response_cb, event_cb, ctx);
+    bufferevent_trigger(bev, EV_WRITE, 0);
+  }
+}
+
+static void send_status_response(context_t* ctx, struct bufferevent* bev) {
+  // write the response header
+  write_header(ctx);
+
+  // write the response to the socket and terminate
+  bufferevent_write_buffer(bev, ctx->out);
+  bufferevent_setcb(bev, NULL, end_response_cb, event_cb, ctx);
+}
+
+static void send_script_response(context_t* ctx, struct bufferevent* bev) {
+  response_t* res = &ctx->gemini.response;
+
+  LOG_DEBUG("Sending gemtext response");
+
+  // parse the gemtext file and run any scripts found within
+  parser_t* parser = create_doc_parser(&ctx->gemini, &ctx->file);
+  struct evbuffer* rendered = evbuffer_new();
+  parse_gemtext_doc(parser, rendered);
+  destroy_doc_parser(parser);
+
+  if (res->status != STATUS_DEFAULT) {
+    // a status code was set by the script, so the rendered body should not be
+    // sent to the client
+    evbuffer_free(rendered);
+    send_status_response(ctx, bev);
+    return;
+  }
+
+  set_response_mime(res, MIMETYPE_GEMTEXT);
+
+  // write the response header to a buffer, followed by the rendered gemtext
+  write_header(ctx);
+  evbuffer_add_buffer(ctx->out, rendered);
+  evbuffer_free(rendered);
+
+  // write the response to the socket and terminate
+  bufferevent_write_buffer(bev, ctx->out);
+  bufferevent_setcb(bev, NULL, end_response_cb, event_cb, ctx);
+}
+
+static void send_file_response(context_t* ctx, struct bufferevent* bev) {
+  request_t* req = &ctx->gemini.request;
+  response_t* res = &ctx->gemini.response;
+
+  LOG_DEBUG("Sending non-gemtext file");
+
+  const char* mimetype = magic_descriptor(magic, ctx->file.fd);
+
+  if (mimetype == NULL) {
+    LOG("Could not determine mimetype of %s; using the default (%s)",
+        req->uri->path, DEFAULT_MIMETYPE);
+    mimetype = DEFAULT_MIMETYPE;
+  }
+
+  set_response_mime(res, mimetype);
+
+  // write response header
+  write_header(ctx);
+  bufferevent_write_buffer(bev, ctx->out);
+
+  // serve the file
+  bufferevent_setcb(bev, NULL, serve_static_file_cb, event_cb, ctx);
 }
 
 static void write_response_cb(struct bufferevent* bev, void* data) {
   context_t* ctx = (context_t*)data;
-  request_t* req = &ctx->request;
-  response_t* res = &ctx->response;
 
-  if (!ctx->error) {
-    LOG_DEBUG("No error; serving file");
-
-    if (req->uri->type == URI_TYPE_GEMTEXT) {
-      LOG_DEBUG("Serving gemtext");
-
-      // write the response header
-      res->mimetype = strdup(MIMETYPE_GEMTEXT);
-      write_header(bev, ctx);
-
-      // parse the gemtext file and run any scripts found within
-      parser_t* parser = create_doc_parser(req, res, ctx->file);
-      parse_gemtext_doc(parser, ctx->out);
-      destroy_doc_parser(parser);
-
-      // write the response to the socket and terminate
-      bufferevent_write_buffer(bev, ctx->out);
+  if (ctx->gemini.response.status == STATUS_DEFAULT) {
+    if (ctx->gemini.request.uri->type == URI_TYPE_GEMTEXT) {
+      send_script_response(ctx, bev);
     } else {
-      LOG_DEBUG("Serving non-gemtext file");
-
-      res->mimetype = get_mimetype(req->uri->path);
-      write_header(bev, ctx);
-      struct evbuffer* buffer = bufferevent_get_output(bev);
-      evbuffer_add_file(buffer, fileno(ctx->file), 0, -1);
+      send_file_response(ctx, bev);
     }
   } else {
-    // write the response header
-    write_header(bev, ctx);
+    send_status_response(ctx, bev);
   }
-
-  bufferevent_setcb(bev, NULL, end_response_cb, event_cb, ctx);
-  bufferevent_trigger(bev, EV_WRITE, 0);
 }
 
 static void read_cb(struct bufferevent* bev, void* data) {
   context_t* ctx = (context_t*)data;
-  request_t* req = &ctx->request;
-  response_t* res = &ctx->response;
+  request_t* req = &ctx->gemini.request;
+  response_t* res = &ctx->gemini.response;
+  file_info_t* file = &ctx->file;
 
   // read the entire request into a buffer
   char request_buffer[MAX_URL_LENGTH + 2] = {0};
-  size_t req_length = bufferevent_read(bev, &request_buffer[0],
-                                       sizeof(request_buffer) / sizeof(char));
+  bufferevent_read(bev, &request_buffer[0],
+                   sizeof(request_buffer) / sizeof(char));
 
   // extract the uri
   req->uri = create_uri(&request_buffer[0]);
 
   if (req->uri == NULL) {
-    res->status = STATUS_BAD_REQUEST;
-    res->meta = strdup("Invalid URI");
-    ctx->error = true;
+    set_response_status(res, STATUS_BAD_REQUEST, META_BAD_REQUEST);
   } else {
     // set the client certificate if one exists
     client_cert_t* cert =
-        (client_cert_t*)SSL_get_ex_data(ctx->ssl, get_client_cert_index());
+        (client_cert_t*)SSL_get_ex_data(ctx->ssl, CLIENT_CERT_INDEX);
     if (cert != NULL) {
       req->cert = cert;
     }
 
     // check whether the requested file exists
-    struct stat file_stat;
-    if (stat(req->uri->path, &file_stat) != 0 || !S_ISREG(file_stat.st_mode)) {
+    struct stat st;
+    if (stat(req->uri->path, &st) != 0 || !S_ISREG(st.st_mode)) {
       LOG_DEBUG("File %s does not exist", req->uri->path);
-      res->status = STATUS_NOT_FOUND;
-      res->meta = strdup("File does not exist");
-      ctx->error = true;
+      set_response_status(res, STATUS_NOT_FOUND, META_NOT_FOUND);
     } else {
       LOG_DEBUG("File %s exists", req->uri->path);
-      ctx->file = fopen(req->uri->path, "rb");
-      if (ctx->file == NULL) {
+      file->ptr = fopen(req->uri->path, "rb");
+      if (file->ptr == NULL) {
         LOG_ERROR("Failed to open file at \"%s\"", req->uri->path);
-        res->status = STATUS_TEMPORARY_FAILURE;
-        res->meta = strdup("Failed to open file");
-        ctx->error = true;
+
+        // if we can't open the file, it may be due to being denied permissions,
+        // which is may have been intentional if the host doesn't want the files
+        // to be served; tell the client they don't exist
+        set_response_status(res, STATUS_NOT_FOUND, META_NOT_FOUND);
+      } else {
+        // file exists and was opened successfully
+        file->fd = fileno(file->ptr);
+        file->size = st.st_size;
       }
     }
   }
@@ -225,14 +289,16 @@ static void read_cb(struct bufferevent* bev, void* data) {
 
 static void listener_cb(struct evconnlistener* listener, evutil_socket_t fd,
                         struct sockaddr* addr, int socklen, void* data) {
-  SSL* ssl = SSL_new((SSL_CTX*)data);
-  SSL_set_ex_data(ssl, get_client_cert_index(), create_client_cert());
+  request_common_state_t* state = (request_common_state_t*)data;
 
-  enum bufferevent_ssl_state state =
+  SSL* ssl = SSL_new(state->ssl_ctx);
+  SSL_set_ex_data(ssl, CLIENT_CERT_INDEX, create_client_cert());
+
+  enum bufferevent_ssl_state ssl_status =
       fd != -1 ? BUFFEREVENT_SSL_ACCEPTING : BUFFEREVENT_SSL_CONNECTING;
   struct event_base* base = evconnlistener_get_base(listener);
   struct bufferevent* bev = bufferevent_openssl_socket_new(
-      base, fd, ssl, state, BEV_OPT_CLOSE_ON_FREE);
+      base, fd, ssl, ssl_status, BEV_OPT_CLOSE_ON_FREE);
 
   if (bev == NULL) {
     LOG_ERROR("Error constructing bufferevent!");
@@ -243,53 +309,100 @@ static void listener_cb(struct evconnlistener* listener, evutil_socket_t fd,
   context_t* ctx = calloc(1, sizeof(context_t));
   ctx->ssl = ssl;
   ctx->out = evbuffer_new();
-  ctx->response.status = STATUS_DEFAULT;
+  ctx->gemini.response.status = STATUS_DEFAULT;
+  ctx->chunk_size = state->options->chunk_size;
 
   bufferevent_setcb(bev, read_cb, NULL, event_cb, ctx);
   bufferevent_enable(bev, EV_READ);
 }
 
-static void term_cb(evutil_socket_t sig, short events, void* data) {
-  LOG_DEBUG("Caught SIGINT; exiting...");
-
-  struct timeval delay = {2, 0};
-  event_base_loopexit((struct event_base*)data, &delay);
+static void signal_shutdown_cb(evutil_socket_t sig, short events, void* data) {
+  LOG_DEBUG("Caught shutdown signal; terminating...");
+  event_base_loopexit((struct event_base*)data, NULL);
 }
 
-static void handle_gemini_requests(net_t* net) {
+static void signal_kill_cb(evutil_socket_t sig, short events, void* data) {
+  LOG_DEBUG("Caught SIGKILL, exiting immediately...");
+  exit(-1);
+}
+
+static void signal_stop_cb(evutil_socket_t sig, short events, void* data) {
+  LOG_DEBUG("Caught SIGSTOP, pausing I/O...");
+  event_base_loopbreak((struct event_base*)data);
+}
+
+static void signal_continue_cb(evutil_socket_t sig, short events, void* data) {
+  LOG_DEBUG("Caught SIGCONT, resuming I/O...");
+  event_base_loopcontinue((struct event_base*)data);
+}
+
+static void add_signal_handlers(struct event** events,
+                                struct event_base* base) {
+  struct event* ev_sigint =
+      evsignal_new(base, SIGINT, signal_shutdown_cb, (void*)base);
+  struct event* ev_sigterm =
+      evsignal_new(base, SIGTERM, signal_shutdown_cb, (void*)base);
+  struct event* ev_sigquit =
+      evsignal_new(base, SIGQUIT, signal_shutdown_cb, (void*)base);
+  struct event* ev_sigcont =
+      evsignal_new(base, SIGQUIT, signal_shutdown_cb, (void*)base);
+
+  evsignal_add(ev_sigint, NULL);
+  evsignal_add(ev_sigterm, NULL);
+  evsignal_add(ev_sigquit, NULL);
+  evsignal_add(ev_sigcont, NULL);
+
+  int index = 0;
+  events[index++] = ev_sigint;
+  events[index++] = ev_sigterm;
+  events[index++] = ev_sigquit;
+  events[index++] = ev_sigcont;
+}
+
+static void free_signal_handlers(struct event** events) {
+  for (int i = 0; i < SIGNAL_HANDLERS_COUNT; ++i) {
+    event_free(events[i]);
+  }
+}
+
+static void handle_gemini_requests(net_t* net, cli_options_t* options) {
   struct event_base* base = event_base_new();
   if (base == NULL) {
-    // TODO: log
+    LOG_ERROR("Failed to create event base!");
     return;
   }
+
+  request_common_state_t state = {net->ssl_ctx, options};
 
   int evflags =
       LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC;
-  struct evconnlistener* listener =
-      evconnlistener_new_bind(base, listener_cb, (void*)net->ssl_ctx, evflags,
-                              -1, net->addr, net->addr_size);
+  struct evconnlistener* listener = evconnlistener_new_bind(
+      base, listener_cb, (void*)&state, evflags, -1, net->addr, net->addr_size);
 
   if (listener == NULL) {
-    // TODO: log
+    LOG_ERROR("Failed to create event listener!");
     return;
   }
 
-  struct event* signal_event =
-      evsignal_new(base, SIGINT | SIGTERM | SIGKILL, term_cb, (void*)base);
-
-  if (signal_event == NULL || event_add(signal_event, NULL) < 0) {
-    // TODO: log
-    return;
-  }
+  struct event* events[SIGNAL_HANDLERS_COUNT];
+  add_signal_handlers(&events[0], base);
 
   event_base_dispatch(base);
 
   evconnlistener_free(listener);
-  event_free(signal_event);
+  free_signal_handlers(&events[0]);
   event_base_free(base);
 }
 
 void listen_for_gemini_requests(cli_options_t* options) {
+  magic = magic_open(MAGIC_MIME | MAGIC_CHECK);
+  if (magic == NULL) {
+    LOG_ERROR("Failed to create libmagic database!");
+    return;
+  }
+
+  magic_load(magic, NULL);
+
   // set up socket + TLS
   net_t* net;
   if ((net = init_net(options)) == NULL) {
@@ -297,7 +410,14 @@ void listen_for_gemini_requests(cli_options_t* options) {
   } else {
     // begin listening for requests
     LOG("Listening for Gemini requests on port %d...", options->gemini_port);
-    handle_gemini_requests(net);
+    handle_gemini_requests(net, options);
     destroy_net(net);
   }
+
+  magic_close(magic);
+}
+
+void set_response_status(response_t* response, int code, const char* meta) {
+  response->status = code;
+  set_response_meta(response, meta);
 }

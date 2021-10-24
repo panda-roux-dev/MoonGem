@@ -15,7 +15,5 @@ net_t* init_net(const cli_options_t* options);
 
 void destroy_net(net_t* net);
 
-void log_remote_address(int sock);
-
 #endif
 

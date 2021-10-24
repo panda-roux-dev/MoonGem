@@ -4,24 +4,22 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-typedef struct request_t request_t;
-typedef struct response_t response_t;
+#include "gemini.h"
+
 typedef struct script_ctx_t script_ctx_t;
 typedef struct evbuffer evbuffer;
 
 typedef struct parser_t {
+  file_info_t* file;
   script_ctx_t* script_ctx;
-  const request_t* request;
-  response_t* response;
-  FILE* file;
+  gemini_state_t* gemini;
 } parser_t;
 
 int init_parser_regex(void);
 
 void cleanup_parser_regex(void);
 
-parser_t* create_doc_parser(const struct request_t* request,
-                            struct response_t* response, FILE* file);
+parser_t* create_doc_parser(gemini_state_t* gemini, file_info_t* file);
 
 void parse_gemtext_doc(parser_t* parser, struct evbuffer* buffer);
 

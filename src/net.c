@@ -3,14 +3,10 @@
 #include <arpa/inet.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 #include "cert.h"
 #include "log.h"
 
-#define CREATE_SOCKET_FAILURE INT_MIN
 #define SET_CERTS_FAILURE INT_MIN
 
 static struct sockaddr* create_addr(int port, int* addr_size) {
@@ -36,7 +32,6 @@ static SSL_CTX* init_ssl_context(void) {
 
   SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
   SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
-
   SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
                      handle_client_certificate);
   SSL_CTX_set_verify_depth(ctx, 0);
@@ -68,7 +63,7 @@ static int set_certs(SSL_CTX* ctx, const char* cert_path,
 
 static void cleanup_ssl(SSL_CTX* ctx) {
   if (ctx != NULL) {
-    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_SSL, get_client_cert_index());
+    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_SSL, CLIENT_CERT_INDEX);
     SSL_CTX_free(ctx);
   }
 
@@ -76,33 +71,6 @@ static void cleanup_ssl(SSL_CTX* ctx) {
   CRYPTO_cleanup_all_ex_data();
   ERR_free_strings();
   EVP_cleanup();
-}
-
-void log_remote_address(int sock) {
-  int port;
-  struct sockaddr_storage addr_storage;
-  char addr_str[INET6_ADDRSTRLEN];
-  socklen_t len = sizeof(addr_str);
-  getpeername(sock, (struct sockaddr*)&addr_storage, &len);
-  switch (addr_storage.ss_family) {
-    case AF_INET: {
-      struct sockaddr_in* addr = (struct sockaddr_in*)&addr_storage;
-      port = ntohs(addr->sin_port);
-      inet_ntop(AF_INET, &addr->sin_addr, addr_str, sizeof(addr_str));
-      break;
-    }
-    case AF_INET6: {
-      struct sockaddr_in6* addr = (struct sockaddr_in6*)&addr_storage;
-      port = ntohs(addr->sin6_port);
-      inet_ntop(AF_INET6, &addr->sin6_addr, addr_str, sizeof(addr_str));
-      break;
-    }
-    default:
-      LOG("Unknown socket family %d", addr_storage.ss_family);
-      return;
-  }
-
-  LOG_NOLF("[%s:%d]", addr_str, port);
 }
 
 net_t* init_net(const cli_options_t* options) {
@@ -139,4 +107,3 @@ void destroy_net(net_t* net) {
 
   free(net);
 }
-

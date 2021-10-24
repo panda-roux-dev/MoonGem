@@ -32,6 +32,10 @@
 #define FUNC_TEMP_REDIRECT "temp_redirect"
 #define FUNC_PERM_REDIRECT "perm_redirect"
 
+#define SCRIPT_BUFFER_SIZE (1 << 16)
+
+static char global_script_buffer[SCRIPT_BUFFER_SIZE];
+
 typedef struct script_ctx_t {
   lua_State* L;
   const request_t* request;
@@ -108,17 +112,13 @@ static void set_script_globals(script_ctx_t* ctx) {
   lua_pushlightuserdata(L, (request_t*)request);
   lua_setfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
 
-  lua_pushinteger(L, 0);
-  lua_setfield(L, LUA_REGISTRYINDEX, FLD_SIZE);
-
-  // set the PATH global variable
   lua_pushstring(L, request->uri->path);
-  lua_setglobal(L, FLD_PATH);
+  lua_setfield(L, LUA_REGISTRYINDEX, FLD_PATH);
 
   // add user input as a global variable, if present
   if (request->uri->input != NULL) {
     lua_pushstring(L, request->uri->input);
-    lua_setglobal(L, FLD_INPUT);
+    lua_setfield(L, LUA_REGISTRYINDEX, FLD_INPUT);
   }
 }
 
@@ -127,7 +127,7 @@ static void set_response_buffer(lua_State* L, struct evbuffer* buffer) {
   lua_setfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
 }
 
-static void add_package_path(script_ctx_t* ctx) {
+static void append_package_path(script_ctx_t* ctx) {
   lua_State* L = ctx->L;
   const char* path = ctx->request->uri->path;
 
@@ -156,8 +156,7 @@ static void add_package_path(script_ctx_t* ctx) {
   lua_setfield(L, -2, "path");
 }
 
-script_ctx_t* create_script_ctx(const request_t* request,
-                                response_t* response) {
+script_ctx_t* create_script_ctx(gemini_state_t* gemini) {
   script_ctx_t* ctx = calloc(1, sizeof(script_ctx_t));
   if (ctx == NULL) {
     LOG_ERROR("Failed to allocate space for the script context");
@@ -165,13 +164,13 @@ script_ctx_t* create_script_ctx(const request_t* request,
   }
 
   lua_State* L = luaL_newstate();
+  luaL_openlibs(L);
 
   ctx->L = L;
-  ctx->request = request;
-  ctx->response = response;
+  ctx->request = &gemini->request;
+  ctx->response = &gemini->response;
 
-  luaL_openlibs(L);
-  add_package_path(ctx);
+  append_package_path(ctx);
   set_script_globals(ctx);
   set_api_methods(L);
 
@@ -190,24 +189,40 @@ void destroy_script(script_ctx_t* ctx) {
 
 script_result_t exec_script(script_ctx_t* ctx, char* script, size_t script_len,
                             struct evbuffer* output) {
+  if (script_len >= SCRIPT_BUFFER_SIZE) {
+    LOG_ERROR(
+        "Refusing to execute a script that is greater than the maximum length "
+        "of %d bytes!",
+        SCRIPT_BUFFER_SIZE - 1);
+    return SCRIPT_ERROR;
+  }
+
   lua_State* L = ctx->L;
 
   set_response_buffer(L, output);
 
-  script = strndup(script, script_len);
-
-  LOG_DEBUG("Script: %s", script);
-
   script_result_t result = SCRIPT_OK;
-  if (luaL_dostring(L, script) != LUA_OK) {
+
+  // we have to copy the script body to a buffer so that we can null-terminate
+  // it, as the Lua API doesn't provide a way to run a string with an explicit
+  // length
+  memcpy(&global_script_buffer[0], script, script_len);
+  global_script_buffer[script_len] = '\0';
+
+  lua_pop(L, lua_gettop(L));
+  if (luaL_dostring(L, &global_script_buffer[0]) != LUA_OK) {
     LOG_ERROR("Error running Lua script: %s", lua_tostring(L, -1));
     result = SCRIPT_ERROR;
+  } else {
+    LOG_DEBUG("Ran a script of length %zu", script_len);
+
+    // if the script returned a string, write it to the buffer because that's
+    // nice
+    if (lua_gettop(L) > 0 && lua_isstring(L, -1)) {
+      const char* text = lua_tostring(L, -1);
+      evbuffer_add_printf(output, "%s", text);
+    }
   }
-
-  // at this point, any resulting text produced by the script is contained in
-  // the results buffer
-
-  free(script);
 
   return result;
 }
