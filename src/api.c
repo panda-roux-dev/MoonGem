@@ -25,7 +25,7 @@ static void set_interrupt_response(response_t* response, int status,
   set_response_meta(response, meta);
 }
 
-int api_head_set_lang(lua_State* L) {
+int api_set_lang(lua_State* L) {
   lua_settop(L, 1);
 
   const char* lang = luaL_checkstring(L, 1);
@@ -38,7 +38,7 @@ int api_head_set_lang(lua_State* L) {
   return 0;
 }
 
-int api_head_get_input(lua_State* L) {
+int api_get_input(lua_State* L) {
   lua_settop(L, 1);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_INPUT);
@@ -59,7 +59,7 @@ int api_head_get_input(lua_State* L) {
   return 1;
 }
 
-int api_head_get_input_sensitive(lua_State* L) {
+int api_get_input_sensitive(lua_State* L) {
   lua_settop(L, 1);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_INPUT);
@@ -81,7 +81,18 @@ int api_head_get_input_sensitive(lua_State* L) {
   return 1;
 }
 
-int api_head_temp_redirect(lua_State* L) {
+int api_has_input(lua_State* L) {
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_INPUT);
+  if (lua_isnoneornil(L, -1)) {
+    lua_pushboolean(L, false);
+  } else {
+    lua_pushboolean(L, true);
+  }
+
+  return 1;
+}
+
+int api_temp_redirect(lua_State* L) {
   lua_settop(L, 1);
 
   const char* uri = luaL_checkstring(L, 1);
@@ -91,7 +102,7 @@ int api_head_temp_redirect(lua_State* L) {
   return 0;
 }
 
-int api_head_perm_redirect(lua_State* L) {
+int api_perm_redirect(lua_State* L) {
   lua_settop(L, 1);
 
   const char* uri = luaL_checkstring(L, 1);
@@ -102,7 +113,163 @@ int api_head_perm_redirect(lua_State* L) {
   return 0;
 }
 
-int api_head_get_cert(lua_State* L) {
+int api_temp_failure(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_TEMPORARY_FAILURE, meta);
+
+  return 0;
+}
+
+int api_unavailable(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_SERVER_UNAVAILABLE, meta);
+
+  return 0;
+}
+
+int api_cgi_error(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_CGI_ERROR, meta);
+
+  return 0;
+}
+
+int api_proxy_error(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_PROXY_ERROR, meta);
+
+  return 0;
+}
+
+int api_slow_down(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_SLOW_DOWN, meta);
+
+  return 0;
+}
+
+int api_perm_failure(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_PERMANENT_FAILURE, meta);
+
+  return 0;
+}
+
+int api_not_found(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_NOT_FOUND, meta);
+
+  return 0;
+}
+
+int api_gone(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_GONE, meta);
+
+  return 0;
+}
+
+int api_proxy_refused(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_PROXY_REQUEST_REFUSED, meta);
+
+  return 0;
+}
+
+int api_bad_request(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_BAD_REQUEST, meta);
+
+  return 0;
+}
+
+int api_cert_required(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_CLIENT_CERTIFICATE_REQUIRED, meta);
+
+  return 0;
+}
+
+int api_cert_unauthorized(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* meta = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_interrupt_response(response, STATUS_CERTIFICATE_NOT_AUTHORIZED, meta);
+
+  return 0;
+}
+
+int api_get_cert(lua_State* L) {
   lua_settop(L, 1);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
@@ -138,7 +305,7 @@ int api_head_get_cert(lua_State* L) {
   return 1;
 }
 
-int api_head_has_cert(lua_State* L) {
+int api_has_cert(lua_State* L) {
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
   request_t* request = (request_t*)lua_touserdata(L, -1);
 
@@ -147,7 +314,7 @@ int api_head_has_cert(lua_State* L) {
   return 1;
 }
 
-int api_body_include(lua_State* L) {
+int api_include(lua_State* L) {
   lua_settop(L, 1);
 
   const char* path = luaL_checkstring(L, 1);
@@ -171,7 +338,7 @@ int api_body_include(lua_State* L) {
   return 0;
 }
 
-int api_body_write(lua_State* L) {
+int api_write(lua_State* L) {
   lua_settop(L, 1);
 
   const char* text = luaL_checkstring(L, 1);
@@ -184,7 +351,7 @@ int api_body_write(lua_State* L) {
   return 0;
 }
 
-int api_body_line(lua_State* L) {
+int api_line(lua_State* L) {
   lua_settop(L, 1);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
@@ -200,7 +367,7 @@ int api_body_line(lua_State* L) {
   return 0;
 }
 
-int api_body_link(lua_State* L) {
+int api_link(lua_State* L) {
   lua_settop(L, 2);
 
   const char* url = luaL_checkstring(L, 1);
@@ -222,7 +389,7 @@ int api_body_link(lua_State* L) {
   return 0;
 }
 
-int api_body_heading(lua_State* L) {
+int api_heading(lua_State* L) {
   lua_settop(L, 2);
 
   const char* text = luaL_checkstring(L, 1);
@@ -241,7 +408,7 @@ int api_body_heading(lua_State* L) {
   return 0;
 }
 
-int api_body_quote(lua_State* L) {
+int api_quote(lua_State* L) {
   lua_settop(L, 1);
 
   const char* text = luaL_checkstring(L, 2);
@@ -254,7 +421,7 @@ int api_body_quote(lua_State* L) {
   return 0;
 }
 
-int api_body_block(lua_State* L) {
+int api_block(lua_State* L) {
   lua_settop(L, 1);
 
   const char* text = luaL_checkstring(L, 2);
@@ -268,7 +435,7 @@ int api_body_block(lua_State* L) {
   return 0;
 }
 
-int api_body_beginblock(lua_State* L) {
+int api_beginblock(lua_State* L) {
   lua_settop(L, 1);
 
   const char* alt = luaL_checkstring(L, 2);
@@ -285,7 +452,7 @@ int api_body_beginblock(lua_State* L) {
   return 0;
 }
 
-int api_body_endblock(lua_State* L) {
+int api_endblock(lua_State* L) {
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
   struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
 

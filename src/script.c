@@ -13,6 +13,29 @@
 
 #define LIBRARY_TABLE_NAME "mg"
 
+#define FUNC_INPUT "get_input"
+#define FUNC_INPUT_SENSITIVE "get_sensitive_input"
+#define FUNC_HAS_INPUT "has_input"
+
+#define FUNC_CERT "get_cert"
+#define FUNC_HAS_CERT "has_cert"
+
+#define FUNC_LANG "set_language"
+#define FUNC_TEMP_REDIRECT "temp_redirect"
+#define FUNC_REDIRECT "redirect"
+#define FUNC_TEMP_FAILURE "temp_failure"
+#define FUNC_UNAVAILABLE "unavailable"
+#define FUNC_CGI_ERROR "cgi_error"
+#define FUNC_PROXY_ERROR "proxy_error"
+#define FUNC_SLOW_DOWN "slow_down"
+#define FUNC_FAILURE "failure"
+#define FUNC_NOT_FOUND "not_found"
+#define FUNC_GONE "gone"
+#define FUNC_PROXY_REFUSED "proxy_refused"
+#define FUNC_BAD_REQUEST "bad_request"
+#define FUNC_CERT_REQUIRED "cert_required"
+#define FUNC_CERT_UNAUTHORIZED "unauthorized"
+
 #define FUNC_INCLUDE "include"
 #define FUNC_WRITE "write"
 #define FUNC_LINE "line"
@@ -22,15 +45,6 @@
 #define FUNC_BLOCK "block"
 #define FUNC_BEGIN_BLOCK "begin_block"
 #define FUNC_END_BLOCK "end_block"
-
-#define FUNC_LANG "set_lang"
-#define FUNC_INPUT "get_input"
-#define FUNC_INPUT_SENSITIVE "get_sensitive_input"
-#define FUNC_CERT "get_cert"
-#define FUNC_CHECKCERT "has_cert"
-#define FUNC_REDIRECT "redirect"
-#define FUNC_TEMP_REDIRECT "temp_redirect"
-#define FUNC_PERM_REDIRECT "perm_redirect"
 
 #define SCRIPT_BUFFER_SIZE (1 << 16)
 
@@ -42,59 +56,77 @@ typedef struct script_ctx_t {
   response_t* response;
 } script_ctx_t;
 
-/*
- * Forward-declare methods defined in api.c
- */
-int api_head_set_lang(lua_State* L);
+/* Input */
+int api_get_input(lua_State* L);
+int api_get_input_sensitive(lua_State* L);
+int api_has_input(lua_State* L);
 
-int api_head_get_input(lua_State* L);
+/* Certificates */
+int api_get_cert(lua_State* L);
+int api_has_cert(lua_State* L);
 
-int api_head_get_input_sensitive(lua_State* L);
+/* Response */
+int api_set_lang(lua_State* L);
+int api_temp_redirect(lua_State* L);
+int api_perm_redirect(lua_State* L);
+int api_temp_failure(lua_State* L);
+int api_unavailable(lua_State* L);
+int api_cgi_error(lua_State* L);
+int api_proxy_error(lua_State* L);
+int api_slow_down(lua_State* L);
+int api_perm_failure(lua_State* L);
+int api_not_found(lua_State* L);
+int api_gone(lua_State* L);
+int api_proxy_refused(lua_State* L);
+int api_bad_request(lua_State* L);
+int api_cert_required(lua_State* L);
+int api_cert_unauthorized(lua_State* L);
 
-int api_head_get_cert(lua_State* L);
-
-int api_head_has_cert(lua_State* L);
-
-int api_head_temp_redirect(lua_State* L);
-
-int api_head_perm_redirect(lua_State* L);
-
-int api_body_include(lua_State* L);
-
-int api_body_write(lua_State* L);
-
-int api_body_line(lua_State* L);
-
-int api_body_link(lua_State* L);
-
-int api_body_heading(lua_State* L);
-
-int api_body_quote(lua_State* L);
-
-int api_body_block(lua_State* L);
-
-int api_body_beginblock(lua_State* L);
-
-int api_body_endblock(lua_State* L);
+/* Body */
+int api_include(lua_State* L);
+int api_write(lua_State* L);
+int api_line(lua_State* L);
+int api_link(lua_State* L);
+int api_heading(lua_State* L);
+int api_quote(lua_State* L);
+int api_block(lua_State* L);
+int api_beginblock(lua_State* L);
+int api_endblock(lua_State* L);
 
 static void set_api_methods(lua_State* L) {
-  luaL_Reg methods[] = {{FUNC_INCLUDE, api_body_include},
-                        {FUNC_WRITE, api_body_write},
-                        {FUNC_LINE, api_body_line},
-                        {FUNC_LINK, api_body_link},
-                        {FUNC_HEADING, api_body_heading},
-                        {FUNC_QUOTE, api_body_quote},
-                        {FUNC_BLOCK, api_body_block},
-                        {FUNC_BEGIN_BLOCK, api_body_beginblock},
-                        {FUNC_END_BLOCK, api_body_endblock},
-                        {FUNC_LANG, api_head_set_lang},
-                        {FUNC_INPUT, api_head_get_input},
-                        {FUNC_INPUT_SENSITIVE, api_head_get_input_sensitive},
-                        {FUNC_CERT, api_head_get_cert},
-                        {FUNC_CHECKCERT, api_head_has_cert},
-                        {FUNC_REDIRECT, api_head_temp_redirect},
-                        {FUNC_TEMP_REDIRECT, api_head_temp_redirect},
-                        {FUNC_PERM_REDIRECT, api_head_perm_redirect},
+  luaL_Reg methods[] = {{FUNC_INPUT, api_get_input},
+                        {FUNC_INPUT_SENSITIVE, api_get_input_sensitive},
+                        {FUNC_HAS_INPUT, api_has_input},
+
+                        {FUNC_CERT, api_get_cert},
+                        {FUNC_HAS_CERT, api_has_cert},
+
+                        {FUNC_LANG, api_set_lang},
+                        {FUNC_REDIRECT, api_perm_redirect},
+                        {FUNC_TEMP_REDIRECT, api_temp_redirect},
+                        {FUNC_TEMP_FAILURE, api_temp_failure},
+                        {FUNC_UNAVAILABLE, api_unavailable},
+                        {FUNC_CGI_ERROR, api_cgi_error},
+                        {FUNC_PROXY_ERROR, api_proxy_error},
+                        {FUNC_SLOW_DOWN, api_slow_down},
+                        {FUNC_FAILURE, api_perm_failure},
+                        {FUNC_NOT_FOUND, api_not_found},
+                        {FUNC_GONE, api_gone},
+                        {FUNC_PROXY_REFUSED, api_proxy_refused},
+                        {FUNC_BAD_REQUEST, api_bad_request},
+                        {FUNC_CERT_REQUIRED, api_cert_required},
+                        {FUNC_CERT_UNAUTHORIZED, api_cert_unauthorized},
+
+                        {FUNC_INCLUDE, api_include},
+                        {FUNC_WRITE, api_write},
+                        {FUNC_LINE, api_line},
+                        {FUNC_LINK, api_link},
+                        {FUNC_HEADING, api_heading},
+                        {FUNC_QUOTE, api_quote},
+                        {FUNC_BLOCK, api_block},
+                        {FUNC_BEGIN_BLOCK, api_beginblock},
+                        {FUNC_END_BLOCK, api_endblock},
+
                         {NULL, NULL}};
 
   luaL_newlib(L, methods);
