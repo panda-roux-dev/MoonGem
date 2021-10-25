@@ -13,10 +13,15 @@
 #define RESPONSE_MIMETYPE_SIZE 32
 #define RESPONSE_LANGUAGE_SIZE 32
 
-#define RESPONSE_SET(buf, val)                                \
-  {                                                           \
-    LOG_DEBUG("Setting " #buf " to \"%s\"", val);             \
-    snprintf(&(buf)[0], sizeof(buf) / sizeof(char), "%s", val); \
+#define RESPONSE_SET(buf, val)                                    \
+  {                                                               \
+    if (val != NULL) {                                            \
+      LOG_DEBUG("Setting " #buf " to \"%s\"", val);               \
+      snprintf(&(buf)[0], sizeof(buf) / sizeof(char), "%s", val); \
+    } else {                                                      \
+      LOG_DEBUG("Clearing " #buf);                                \
+      buf[0] = '\0';                                              \
+    }                                                             \
   }
 
 #define set_response_meta(resp, val) RESPONSE_SET((resp)->meta, val)
