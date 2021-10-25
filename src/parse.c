@@ -95,12 +95,20 @@ void parse_gemtext_doc(parser_t* parser, struct evbuffer* buffer) {
       goto done;
     }
 
+    if (response->interrupted) {
+      // the script executed a halting method call (i.e. status code response),
+      // so we should stop parsing the document and return immediately
+      break;
+    }
+
     cursor += block->rm_eo + 1;
   }
 
-  // copy any remaining gemtext into the result
-  evbuffer_add(buffer, cursor,
-               (uintptr_t)(body) + parser->file->size - (uintptr_t)cursor);
+  if (!response->interrupted) {
+    // copy any remaining gemtext into the result
+    evbuffer_add(buffer, cursor,
+                 (uintptr_t)(body) + parser->file->size - (uintptr_t)cursor);
+  }
 
 done:
   free(body);

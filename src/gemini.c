@@ -178,7 +178,7 @@ static void send_script_response(context_t* ctx, struct bufferevent* bev) {
   parse_gemtext_doc(parser, rendered);
   destroy_doc_parser(parser);
 
-  if (res->status != STATUS_DEFAULT) {
+  if (res->interrupted || res->status != STATUS_DEFAULT) {
     // a status code was set by the script, so the rendered body should not be
     // sent to the client
     evbuffer_free(rendered);
