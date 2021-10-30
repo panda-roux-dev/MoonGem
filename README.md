@@ -13,7 +13,7 @@ Script blocks are denoted using special begin/end line tokens. An example page m
 
 Lua scripts are enclosed by double curly-braces.
 
-{{ for i = 1, 10 do mg.line(i) end }}
+{{ for i = 1, 10 do line(i) end }}
 
 
 # Example 2
@@ -26,9 +26,9 @@ If a script returns a string, that string will be written to the rendered gemtex
 # Example 3
 
 {{
-  mg.head("Script blocks may span multiple lines.")
-  mg.line("There are several methods that modify response headers")
-  mg.set_language("en-US")
+  head("Script blocks may span multiple lines.")
+  line("There are several methods that modify response headers")
+  set_language("en-US")
 }}
 ```
 
@@ -73,14 +73,75 @@ Content
 ## API
 
 The start and end of script sections are indicated with a double curly-braces.
-* Start: `{{`
-* End: `}}`
+- Start: `{{`
+- End: `}}`
 
-A single global variable PATH contains the path of the requested page (i.e. /my/document.gmi).
+A single global variable PATH contains the path of the requested page (i.e. /some/path/index.gmi).
+
+All of the MoonGem-defined methods listed below are contained within a table called `mg`.
 
 ### Body
 
+- include(<file-path>)
+
+- write(<text>)
+
+- line([text])
+
+- link([text])
+
+- head(<text>, [level])
+
+- quote(<text>)
+
+- block(<text>)
+
+- begin_block([alt-text])
+
+- end_block()
+
 ### Header
+
+- set_language(<language>)
+
+- temp_redirect(<url>)
+
+- redirect(<url>)
+
+- temp_failure([meta])
+
+- unavailable([meta])
+
+- cgi_error([meta])
+
+- proxy_error([meta])
+
+- slow_down([meta])
+
+- failure([meta])
+
+- not_found([meta])
+
+- gone([meta])
+
+- proxy_refused([meta])
+
+- bad_request([meta])
+
+- cert_required([meta])
+
+- unauthorized([meta])
+
+### Input
+
+- get_input([meta])
+
+- get_sensitive_input([meta])
+
+- has_input()
 
 ### Certificate
 
+- get_cert([meta])
+
+- has_cert()
