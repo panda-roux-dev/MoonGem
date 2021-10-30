@@ -40,7 +40,7 @@
 #define FUNC_WRITE "write"
 #define FUNC_LINE "line"
 #define FUNC_LINK "link"
-#define FUNC_HEADING "heading"
+#define FUNC_HEADING "head"
 #define FUNC_QUOTE "quote"
 #define FUNC_BLOCK "block"
 #define FUNC_BEGIN_BLOCK "begin_block"
