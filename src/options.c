@@ -44,9 +44,11 @@ cli_options_t* parse_options(int argc, const char** argv) {
       OPT_STRING('k', "key", &key_path, "(required) key file path (.pem)"),
       OPT_GROUP("Network"),
       OPT_INTEGER('p', "port", &options->gemini_port,
-                  "port to listen for Gemini requests on"),
+                  "port to listen for Gemini requests on (default: 1965)"),
       OPT_GROUP("Content"),
-      OPT_STRING('r', "root", &root, "root from which to serve content"),
+      OPT_STRING(
+          'r', "root", &root,
+          "root directory from which to serve content (default: current)"),
       OPT_INTEGER('c', "chunk", &options->chunk_size,
                   "size in bytes of the chunks loaded into memory while "
                   "serving static files (default: 16384)"),
