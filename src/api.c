@@ -19,7 +19,7 @@
 #define FLD_CERT_EXPIRATION "not_after"
 
 static void set_interrupt_response(response_t* response, int status,
-                                   const char* meta) {
+				   const char* meta) {
   response->interrupted = true;
   response->status = status;
   set_response_meta(response, meta);
@@ -69,7 +69,7 @@ int api_get_input_sensitive(lua_State* L) {
 
     if (lua_isnoneornil(L, 1)) {
       set_interrupt_response(response, STATUS_SENSITIVE_INPUT,
-                             META_SENSITIVE_INPUT);
+			     META_SENSITIVE_INPUT);
     } else {
       const char* prompt = luaL_checkstring(L, 1);
       set_interrupt_response(response, STATUS_SENSITIVE_INPUT, prompt);
@@ -283,11 +283,11 @@ int api_get_cert(lua_State* L) {
 
     if (lua_isnoneornil(L, 2)) {
       set_interrupt_response(response, STATUS_CLIENT_CERTIFICATE_REQUIRED,
-                             META_CLIENT_CERTIFICATE_REQUIRED);
+			     META_CLIENT_CERTIFICATE_REQUIRED);
     } else {
       const char* prompt = luaL_checkstring(L, 2);
       set_interrupt_response(response, STATUS_CLIENT_CERTIFICATE_REQUIRED,
-                             prompt);
+			     prompt);
     }
 
     return 0;
@@ -324,9 +324,9 @@ int api_include(lua_State* L) {
   if (stat(path, &st) != 0 || !S_ISREG(st.st_mode) ||
       (fp = fopen(path, "rb")) == NULL) {
     luaL_error(L,
-               "Failed to include \"%s\" because it doesn't exist or is not a "
-               "regular file",
-               path);
+	       "Failed to include \"%s\" because it doesn't exist or is not a "
+	       "regular file",
+	       path);
     return 0;
   }
 
@@ -411,7 +411,7 @@ int api_heading(lua_State* L) {
 int api_quote(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* text = luaL_checkstring(L, 2);
+  const char* text = luaL_checkstring(L, 1);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
   struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
@@ -424,7 +424,7 @@ int api_quote(lua_State* L) {
 int api_block(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* text = luaL_checkstring(L, 2);
+  const char* text = luaL_checkstring(L, 1);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
   struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
@@ -438,7 +438,7 @@ int api_block(lua_State* L) {
 int api_beginblock(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* alt = luaL_checkstring(L, 2);
+  const char* alt = luaL_checkstring(L, 1);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
   struct evbuffer* buffer = (struct evbuffer*)lua_touserdata(L, -1);
