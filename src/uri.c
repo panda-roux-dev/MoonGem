@@ -83,7 +83,7 @@ static void standardize_path(char** path) {
 
     *path = tmp;
     strncat(&(*path)[initial_len], "/" DEFAULT_DOCUMENT,
-            sizeof(DEFAULT_DOCUMENT) - 1);
+            sizeof(DEFAULT_DOCUMENT) + 1);
   } else {
     LOG_DEBUG("Path looks like a file; leaving it as-is");
   }
