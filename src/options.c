@@ -49,7 +49,7 @@ cli_options_t* parse_options(int argc, const char** argv) {
       OPT_STRING(
           'r', "root", &root,
           "root directory from which to serve content (default: current)"),
-      OPT_INTEGER('c', "chunk", &options->chunk_size,
+      OPT_INTEGER('u', "chunk", &options->chunk_size,
                   "size in bytes of the chunks loaded into memory while "
                   "serving static files (default: 16384)"),
       OPT_END(),
