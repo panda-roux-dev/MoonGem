@@ -5,36 +5,24 @@ packages:
   - clang
   - lua
   - openssl
+  - libevent
+  - pcre2
 sources:
   - https://git.sr.ht/~panda-roux/MoonGem
 artifacts:
   - moongem.tar.xz
-  - moongem_debug.tar.xz
   - MOONGEM_SHA512SUM
-  - MOONGEM_DEBUG_SHA512SUM
 tasks:
   - setup: |
-      mkdir build_debug
-      mkdir build
       export CC=clang
-  - timestamp:
       echo $(date -R) > TIMESTAMP
-  - build-debug: |
-      cd build_debug
-      cmake -DCMAKE_BUILD_TYPE=Debug ../MoonGem
-      make all
   - build: |
-      cd build
-      cmake -DCMAKE_BUILD_TYPE=Release ../MoonGem
-      make all
+      cmake -B ./build -DCMAKE_BUILD_TYPE=RelMinSize
+      cd ./build && make -j moongem
       strip --strip-unneeded moongem
   - compress: |
       cp build/moongem .
       tar -cJf moongem.tar.xz moongem TIMESTAMP
-  - compress-debug: |
-      cp build_debug/moongem .
-      tar -cJf moongem_debug.tar.xz moongem TIMESTAMP
   - checksum: |
       sha512sum moongem.tar.xz > MOONGEM_SHA512SUM
-      sha512sum moongem_debug.tar.xz > MOONGEM_DEBUG_SHA512SUM
 
