@@ -6,7 +6,7 @@
 
 MoonGem is a Gemini protocol server written in C. It supports serving static files as well as Gemtext (.gmi) files with inline Lua scripting.
 
-Script blocks are denoted using special begin/end line tokens. An example page might look like this:
+An example page might look like this:
 
 ```
 # Example 1
@@ -34,10 +34,10 @@ If a script returns a string, that string will be written to the page verbatim.
 
 ## Dependencies
 
-OpenSSL 1.1.1 or later
-Lua 5.4 (5.3 may work but I haven't tried it)
-LibMagic
-LibEvent 2.1
+- OpenSSL 1.1.1 or later
+- Lua 5.4 (5.3 may work but I haven't tried it)
+- LibMagic
+- LibEvent 2.1
 
 ## Installation
 
