@@ -17,7 +17,7 @@ tasks:
       export CC=clang
       echo $(date -R) > TIMESTAMP
   - build: |
-      cmake -B ./build -DCMAKE_BUILD_TYPE=RelMinSize
+      cmake -B ./build -DCMAKE_BUILD_TYPE=RelMinSize .
       cd ./build && make -j moongem
       strip --strip-unneeded moongem
   - compress: |
