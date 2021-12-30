@@ -16,9 +16,11 @@ tasks:
   - setup: |
       export CC=clang
       echo $(date -R) > TIMESTAMP
+      mkdir build
   - build: |
-      cmake -B ./build -DCMAKE_BUILD_TYPE=RelMinSize .
-      cd ./build && make -j moongem
+      cd build
+      cmake -DCMAKE_BUILD_TYPE=RelMinSize ..
+      make -j moongem
       strip --strip-unneeded moongem
   - compress: |
       cp build/moongem .
