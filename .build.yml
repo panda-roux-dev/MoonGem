@@ -19,7 +19,7 @@ tasks:
       mkdir build
   - build: |
       cd build
-      cmake -DCMAKE_BUILD_TYPE=RelMinSize ../MoonGem
+      cmake ../MoonGem
       make -j moongem
       strip --strip-unneeded moongem
   - compress: |
