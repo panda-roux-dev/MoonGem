@@ -18,7 +18,7 @@ Lua scripts are enclosed by double curly-braces.
 
 # Example 2
 
-If a script returns a string, that string will be written to the rendered gemtext as-is.
+If a script returns a string, that string will be written to the page verbatim.
 
 {{ return "Meow!" }}
 
@@ -26,7 +26,7 @@ If a script returns a string, that string will be written to the rendered gemtex
 # Example 3
 
 {{
-  mg.head("Script blocks may span multiple lines.")
+  mg.head("Script blocks may span multiple lines", 2)
   mg.line("There are several methods that modify response headers")
   mg.set_language("en-US")
 }}
@@ -80,66 +80,81 @@ All of the MoonGem-defined functionality is contained within a table called `mg`
 
 ### Body
 
-- mg.include(<file-path>)
+These methods modify the body of the Gemini page.
 
-- mg.write(<text>)
-
-- mg.line([text])
-
-- mg.link(<uri>, [text])
-
-- mg.head(<text>, [level])
-
-- mg.quote(<text>)
-
-- mg.block(<text>)
-
-- mg.begin_block([alt-text])
-
-- mg.end_block()
+- `mg.include(<file-path>)`
+  - Inserts the contents of the file at <file-path> into the page verbatim
+  - The file is not processed in any way
+- `mg.write(<text>)`
+  - Writes `text` to the page
+- `mg.line([text])`
+  - Writes `text` to the page followed by a line break
+- `mg.link(<uri>, [text])`
+  - Writes a link to `uri` on the page, and optionally includes the alt-text `text`
+- `mg.head(<text>, [level])`
+  - Writes a header line containing `text` to the page, with an optional header level
+  - The default header level is 1 (i.e. a single '#' character)
+- `mg.quote(<text>)`
+  - Writes `text` in a quotation line to the page
+- `mg.block(<text>)`
+  - Writes `text` in a preformatted block to the page
+- `mg.begin_block([alt-text])`
+  - Writes the beginning of a preformatted block to the page, with optional `alt-text`
+- `mg.end_block()`
+  - Writes the end of a preformatted block to the page
+  - Should follow `mg.begin_block`
 
 ### Header
 
-- mg.set_language(<language>)
+These methods modify the response header.
 
-- mg.temp_redirect(<url>)
+If a method is called which modifies the response's status code (which all but the first of these do), then no further scripts will be run and the server will send the response immediately.
 
-- mg.redirect(<url>)
+- `mg.set_language(<language>)`
+  - Sets the `lang` portion of the response header, indicating the language(s) that the page is written in
+- `mg.temp_redirect(<url>)`
+  - Responds with a code-30 temporary redirect to `url`
+- `mg.redirect(<url>)`
+  - Responds with a code-31 redirect to `url`
 
-- mg.temp_failure([meta])
-
-- mg.unavailable([meta])
-
-- mg.cgi_error([meta])
-
-- mg.proxy_error([meta])
-
-- mg.slow_down([meta])
-
-- mg.failure([meta])
-
-- mg.not_found([meta])
-
-- mg.gone([meta])
-
-- mg.proxy_refused([meta])
-
-- mg.bad_request([meta])
-
-- mg.cert_required([meta])
-
-- mg.unauthorized([meta])
+- The following methods each causes the server to respond with one of the status codes in the 40 to 60 range.  An optional `meta` string may be appended to the response in order to provide the client with more information.
+  - `mg.temp_failure([meta])`
+  - `mg.unavailable([meta])`
+  - `mg.cgi_error([meta])`
+  - `mg.proxy_error([meta])`
+  - `mg.slow_down([meta])`
+  - `mg.failure([meta])`
+  - `mg.not_found([meta])`
+  - `mg.gone([meta])`
+  - `mg.proxy_refused([meta])`
+  - `mg.bad_request([meta])`
+  - `mg.cert_required([meta])`
+  - `mg.unauthorized([meta])`
 
 ### Input
 
-- mg.get_input([meta])
+These methods are concerned with handling user-input.
 
-- mg.get_sensitive_input([meta])
-
-- mg.has_input()
+- `mg.get_input([meta])`
+  - If an input argument was included in the request URI, this method returns that value
+  - If no input was provided in the request, then the server responds with a code-10 status response and optional `meta` string
+- `mg.get_sensitive_input([meta])`
+  - Same as `mg.get_input`, but uses status code 11
+  - Client support for this is status code is not guaranteed
+- `mg.has_input()`
+  - Returns `true` if there was an input argument included in the request
+  - Otherwise returns `false`
 
 ### Certificate
 
-- mg.get_cert([meta])
+- `mg.get_cert([meta])`
+  - If a client certificate was provided along with the request, then a table with the following members is returned:
+    - `fingerprint`: a string representing an SHA256 hash of the certificate's modulus in hexadecimal format
+    - `not_after`: a unix timestamp representing the expiration time of the certificate
+  - If no client certificate was provided with the request, then the server responds with a code-60 status and optional `meta` string
+    - If client certificates are an optional feature of your application, use `mg.has_cert` to check whether one exists before calling this method in order to avoid the code-60 response
+  - TODO: fetch additional fields from the cert (CN, etc.)
+- `mg.has_cert()`
+  - Returns `true` if a client certificate was included along with the request
+  - Otherwise returns `false`
 
-- mg.has_cert()
