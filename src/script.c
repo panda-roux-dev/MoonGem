@@ -16,6 +16,7 @@
 #define FUNC_INPUT "get_input"
 #define FUNC_INPUT_SENSITIVE "get_sensitive_input"
 #define FUNC_HAS_INPUT "has_input"
+#define FUNC_GET_PATH "get_path"
 
 #define FUNC_CERT "get_cert"
 #define FUNC_HAS_CERT "has_cert"
@@ -60,6 +61,7 @@ typedef struct script_ctx_t {
 int api_get_input(lua_State* L);
 int api_get_input_sensitive(lua_State* L);
 int api_has_input(lua_State* L);
+int api_get_path(lua_State* L);
 
 /* Certificates */
 int api_get_cert(lua_State* L);
@@ -97,6 +99,7 @@ static void set_api_methods(lua_State* L) {
   luaL_Reg methods[] = {{FUNC_INPUT, api_get_input},
                         {FUNC_INPUT_SENSITIVE, api_get_input_sensitive},
                         {FUNC_HAS_INPUT, api_has_input},
+                        {FUNC_GET_PATH, api_get_path},
 
                         {FUNC_CERT, api_get_cert},
                         {FUNC_HAS_CERT, api_has_cert},
@@ -133,7 +136,7 @@ static void set_api_methods(lua_State* L) {
   lua_setglobal(L, LIBRARY_TABLE_NAME);
 }
 
-static void set_script_globals(script_ctx_t* ctx) {
+static void set_registry_data(script_ctx_t* ctx) {
   lua_State* L = ctx->L;
   response_t* response = ctx->response;
   const request_t* request = ctx->request;
@@ -143,9 +146,6 @@ static void set_script_globals(script_ctx_t* ctx) {
 
   lua_pushlightuserdata(L, (request_t*)request);
   lua_setfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
-
-  lua_pushstring(L, request->uri->path);
-  lua_setfield(L, LUA_REGISTRYINDEX, FLD_PATH);
 
   // add user input as a global variable, if present
   if (request->uri->input != NULL) {
@@ -203,7 +203,7 @@ script_ctx_t* create_script_ctx(gemini_state_t* gemini) {
   ctx->response = &gemini->response;
 
   append_package_path(ctx);
-  set_script_globals(ctx);
+  set_registry_data(ctx);
   set_api_methods(L);
 
   return ctx;

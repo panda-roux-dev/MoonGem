@@ -92,6 +92,19 @@ int api_has_input(lua_State* L) {
   return 1;
 }
 
+int api_get_path(lua_State* L) {
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
+  request_t* request = (request_t*)lua_touserdata(L, -1);
+
+  if (request->uri->path != NULL) {
+    lua_pushstring(L, request->uri->path);
+  } else {
+    lua_pushnil(L);
+  }
+
+  return 1;
+}
+
 int api_temp_redirect(lua_State* L) {
   lua_settop(L, 1);
 

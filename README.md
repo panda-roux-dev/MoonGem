@@ -13,7 +13,7 @@ Script blocks are denoted using special begin/end line tokens. An example page m
 
 Lua scripts are enclosed by double curly-braces.
 
-{{ for i = 1, 10 do line(i) end }}
+{{ for i = 1, 10 do mg.line(i) end }}
 
 
 # Example 2
@@ -26,9 +26,9 @@ If a script returns a string, that string will be written to the rendered gemtex
 # Example 3
 
 {{
-  head("Script blocks may span multiple lines.")
-  line("There are several methods that modify response headers")
-  set_language("en-US")
+  mg.head("Script blocks may span multiple lines.")
+  mg.line("There are several methods that modify response headers")
+  mg.set_language("en-US")
 }}
 ```
 
@@ -76,72 +76,70 @@ The start and end of script sections are indicated with a double curly-braces.
 - Start: `{{`
 - End: `}}`
 
-A single global variable PATH contains the path of the requested page (i.e. /some/path/index.gmi).
-
-All of the MoonGem-defined methods listed below are contained within a table called `mg`.
+All of the MoonGem-defined functionality is contained within a table called `mg`.
 
 ### Body
 
-- include(<file-path>)
+- mg.include(<file-path>)
 
-- write(<text>)
+- mg.write(<text>)
 
-- line([text])
+- mg.line([text])
 
-- link([text])
+- mg.link(<uri>, [text])
 
-- head(<text>, [level])
+- mg.head(<text>, [level])
 
-- quote(<text>)
+- mg.quote(<text>)
 
-- block(<text>)
+- mg.block(<text>)
 
-- begin_block([alt-text])
+- mg.begin_block([alt-text])
 
-- end_block()
+- mg.end_block()
 
 ### Header
 
-- set_language(<language>)
+- mg.set_language(<language>)
 
-- temp_redirect(<url>)
+- mg.temp_redirect(<url>)
 
-- redirect(<url>)
+- mg.redirect(<url>)
 
-- temp_failure([meta])
+- mg.temp_failure([meta])
 
-- unavailable([meta])
+- mg.unavailable([meta])
 
-- cgi_error([meta])
+- mg.cgi_error([meta])
 
-- proxy_error([meta])
+- mg.proxy_error([meta])
 
-- slow_down([meta])
+- mg.slow_down([meta])
 
-- failure([meta])
+- mg.failure([meta])
 
-- not_found([meta])
+- mg.not_found([meta])
 
-- gone([meta])
+- mg.gone([meta])
 
-- proxy_refused([meta])
+- mg.proxy_refused([meta])
 
-- bad_request([meta])
+- mg.bad_request([meta])
 
-- cert_required([meta])
+- mg.cert_required([meta])
 
-- unauthorized([meta])
+- mg.unauthorized([meta])
 
 ### Input
 
-- get_input([meta])
+- mg.get_input([meta])
 
-- get_sensitive_input([meta])
+- mg.get_sensitive_input([meta])
 
-- has_input()
+- mg.has_input()
 
 ### Certificate
 
-- get_cert([meta])
+- mg.get_cert([meta])
 
-- has_cert()
+- mg.has_cert()

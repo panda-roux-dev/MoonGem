@@ -10,7 +10,6 @@
 #define FLD_RESPONSE "__RESPONSE"
 #define FLD_REQUEST "__REQUEST"
 #define FLD_BUFFER "__BUFFER"
-#define FLD_PATH "__PATH"
 #define FLD_INPUT "__INPUT"
 
 typedef struct script_ctx_t script_ctx_t;
