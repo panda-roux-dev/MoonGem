@@ -338,19 +338,19 @@ gemini_listener_t* init_gemini_listener(cli_options_t* options,
     return NULL;
   }
 
-  gemini_listener_t* gemini = malloc(sizeof(gemini_listener_t));
+  gemini_listener_t* gemini = calloc(1, sizeof(gemini_listener_t));
 
   gemini->magic = init_magic();
   if (gemini->magic == NULL) {
     LOG_ERROR("Failed to load libmagic database");
-    return NULL;
+    goto cleanup;
   }
 
   // set up socket + TLS
   gemini->net = init_net(options);
   if (gemini->net == NULL) {
     LOG_ERROR("Failed to initialize socket for Gemini listener");
-    return NULL;
+    goto cleanup;
   }
 
   gemini->options = options;
@@ -360,10 +360,14 @@ gemini_listener_t* init_gemini_listener(cli_options_t* options,
                               -1, gemini->net->addr, gemini->net->addr_size);
   if (gemini->listener == NULL) {
     LOG_ERROR("Failed to create event listener");
-    return NULL;
+    goto cleanup;
   }
 
   return gemini;
+
+cleanup:
+  cleanup_gemini_listener(gemini);
+  return NULL;
 }
 
 void cleanup_gemini_listener(gemini_listener_t* gemini) {
