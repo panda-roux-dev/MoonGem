@@ -5,12 +5,10 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <event2/bufferevent_ssl.h>
-#include <event2/event.h>
 #include <event2/listener.h>
 #include <event2/util.h>
 #include <magic.h>
 #include <openssl/ssl.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -30,21 +28,24 @@
 #define DEFAULT_MIMETYPE "application/octet-stream"
 
 #define SIGNAL_HANDLERS_COUNT 4
+#define LISTENER_EVFLAGS \
+  (LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC)
 
-static struct magic_set* magic;
+typedef struct gemini_listener_t {
+  struct evconnlistener* listener;
+  cli_options_t* options;
+  net_t* net;
+  struct magic_set* magic;
+} gemini_listener_t;
 
 typedef struct context_t {
-  gemini_state_t gemini;
+  gemini_context_t gemini;
   file_info_t file;
-  int chunk_size;
   struct evbuffer* out;
   SSL* ssl;
-} context_t;
-
-typedef struct request_common_state_t {
-  SSL_CTX* ssl_ctx;
   cli_options_t* options;
-} request_common_state_t;
+  struct magic_set* magic;
+} context_t;
 
 static client_cert_t* create_client_cert() {
   client_cert_t* cert = malloc(sizeof(client_cert_t));
@@ -95,7 +96,7 @@ static void end_response_cb(struct bufferevent* bev, void* data) {
 }
 
 static void write_header(context_t* ctx) {
-  gemini_state_t* gemini = &ctx->gemini;
+  gemini_context_t* gemini = &ctx->gemini;
   response_t* res = &gemini->response;
   struct evbuffer* out = ctx->out;
 
@@ -139,7 +140,8 @@ static void serve_static_file_cb(struct bufferevent* bev, void* data) {
 
   // while there remains data to be buffered, load another block
   if (remaining > 0) {
-    size_t length = remaining > ctx->chunk_size ? ctx->chunk_size : remaining;
+    size_t chunk_size = ctx->options->chunk_size;
+    size_t length = remaining > chunk_size ? chunk_size : remaining;
     struct evbuffer_file_segment* segment =
         evbuffer_file_segment_new(file->fd, file->offset, length, 0);
     evbuffer_add_file_segment(ctx->out, segment, 0, -1);
@@ -204,7 +206,7 @@ static void send_file_response(context_t* ctx, struct bufferevent* bev) {
 
   LOG_DEBUG("Sending non-gemtext file");
 
-  const char* mimetype = magic_descriptor(magic, ctx->file.fd);
+  const char* mimetype = magic_descriptor(ctx->magic, ctx->file.fd);
 
   if (mimetype == NULL) {
     LOG("Could not determine mimetype of %s; using the default (%s)",
@@ -289,9 +291,9 @@ static void read_cb(struct bufferevent* bev, void* data) {
 
 static void listener_cb(struct evconnlistener* listener, evutil_socket_t fd,
                         struct sockaddr* addr, int socklen, void* data) {
-  request_common_state_t* state = (request_common_state_t*)data;
+  gemini_listener_t* gemini = (gemini_listener_t*)data;
 
-  SSL* ssl = SSL_new(state->ssl_ctx);
+  SSL* ssl = SSL_new(gemini->net->ssl_ctx);
   SSL_set_ex_data(ssl, CLIENT_CERT_INDEX, create_client_cert());
 
   enum bufferevent_ssl_state ssl_status =
@@ -310,111 +312,81 @@ static void listener_cb(struct evconnlistener* listener, evutil_socket_t fd,
   ctx->ssl = ssl;
   ctx->out = evbuffer_new();
   ctx->gemini.response.status = STATUS_DEFAULT;
-  ctx->chunk_size = state->options->chunk_size;
+  ctx->magic = gemini->magic;
+  ctx->options = gemini->options;
 
   bufferevent_setcb(bev, read_cb, NULL, event_cb, ctx);
   bufferevent_enable(bev, EV_READ);
 }
 
-static void signal_shutdown_cb(evutil_socket_t sig, short events, void* data) {
-  LOG_DEBUG("Caught shutdown signal; terminating...");
-  event_base_loopexit((struct event_base*)data, NULL);
+static bool init_regex(void) {
+  return init_uri_regex() == 0 && init_parser_regex() == 0;
 }
 
-static void signal_kill_cb(evutil_socket_t sig, short events, void* data) {
-  LOG_DEBUG("Caught SIGKILL, exiting immediately...");
-  exit(-1);
-}
-
-static void signal_stop_cb(evutil_socket_t sig, short events, void* data) {
-  LOG_DEBUG("Caught SIGSTOP, pausing I/O...");
-  event_base_loopbreak((struct event_base*)data);
-}
-
-static void signal_continue_cb(evutil_socket_t sig, short events, void* data) {
-  LOG_DEBUG("Caught SIGCONT, resuming I/O...");
-  event_base_loopcontinue((struct event_base*)data);
-}
-
-static void add_signal_handlers(struct event** events,
-                                struct event_base* base) {
-  struct event* ev_sigint =
-      evsignal_new(base, SIGINT, signal_shutdown_cb, (void*)base);
-  struct event* ev_sigterm =
-      evsignal_new(base, SIGTERM, signal_shutdown_cb, (void*)base);
-  struct event* ev_sigquit =
-      evsignal_new(base, SIGQUIT, signal_shutdown_cb, (void*)base);
-  struct event* ev_sigcont =
-      evsignal_new(base, SIGQUIT, signal_shutdown_cb, (void*)base);
-
-  evsignal_add(ev_sigint, NULL);
-  evsignal_add(ev_sigterm, NULL);
-  evsignal_add(ev_sigquit, NULL);
-  evsignal_add(ev_sigcont, NULL);
-
-  int index = 0;
-  events[index++] = ev_sigint;
-  events[index++] = ev_sigterm;
-  events[index++] = ev_sigquit;
-  events[index++] = ev_sigcont;
-}
-
-static void free_signal_handlers(struct event** events) {
-  for (int i = 0; i < SIGNAL_HANDLERS_COUNT; ++i) {
-    event_free(events[i]);
+static struct magic_set* init_magic(void) {
+  struct magic_set* magic = magic_open(MAGIC_MIME | MAGIC_CHECK);
+  if (magic != NULL) {
+    magic_load(magic, NULL);
   }
+  return magic;
 }
 
-static void handle_gemini_requests(net_t* net, cli_options_t* options) {
-  struct event_base* base = event_base_new();
-  if (base == NULL) {
-    LOG_ERROR("Failed to create event base!");
-    return;
+gemini_listener_t* init_gemini_listener(cli_options_t* options,
+                                        struct event_base* evtbase) {
+  if (!init_regex()) {
+    LOG_ERROR("Failed to compile gemini regex");
+    return NULL;
   }
 
-  request_common_state_t state = {net->ssl_ctx, options};
+  gemini_listener_t* gemini = malloc(sizeof(gemini_listener_t));
 
-  int evflags =
-      LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC;
-  struct evconnlistener* listener = evconnlistener_new_bind(
-      base, listener_cb, (void*)&state, evflags, -1, net->addr, net->addr_size);
-
-  if (listener == NULL) {
-    LOG_ERROR("Failed to create event listener!");
-    return;
+  gemini->magic = init_magic();
+  if (gemini->magic == NULL) {
+    LOG_ERROR("Failed to load libmagic database");
+    return NULL;
   }
-
-  struct event* events[SIGNAL_HANDLERS_COUNT];
-  add_signal_handlers(&events[0], base);
-
-  event_base_dispatch(base);
-
-  evconnlistener_free(listener);
-  free_signal_handlers(&events[0]);
-  event_base_free(base);
-}
-
-void listen_for_gemini_requests(cli_options_t* options) {
-  magic = magic_open(MAGIC_MIME | MAGIC_CHECK);
-  if (magic == NULL) {
-    LOG_ERROR("Failed to create libmagic database!");
-    return;
-  }
-
-  magic_load(magic, NULL);
 
   // set up socket + TLS
-  net_t* net;
-  if ((net = init_net(options)) == NULL) {
+  gemini->net = init_net(options);
+  if (gemini->net == NULL) {
     LOG_ERROR("Failed to initialize socket for Gemini listener");
-  } else {
-    // begin listening for requests
-    LOG("Listening for Gemini requests on port %d...", options->gemini_port);
-    handle_gemini_requests(net, options);
-    destroy_net(net);
+    return NULL;
   }
 
-  magic_close(magic);
+  gemini->options = options;
+
+  gemini->listener =
+      evconnlistener_new_bind(evtbase, listener_cb, gemini, LISTENER_EVFLAGS,
+                              -1, gemini->net->addr, gemini->net->addr_size);
+  if (gemini->listener == NULL) {
+    LOG_ERROR("Failed to create event listener");
+    return NULL;
+  }
+
+  return gemini;
+}
+
+void cleanup_gemini_listener(gemini_listener_t* gemini) {
+  cleanup_uri_regex();
+  cleanup_parser_regex();
+
+  if (gemini == NULL) {
+    return;
+  }
+
+  if (gemini->listener != NULL) {
+    evconnlistener_free(gemini->listener);
+  }
+
+  if (gemini->net != NULL) {
+    destroy_net(gemini->net);
+  }
+
+  if (gemini->magic != NULL) {
+    magic_close(gemini->magic);
+  }
+
+  free(gemini);
 }
 
 void set_response_status(response_t* response, int code, const char* meta) {

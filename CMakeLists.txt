@@ -25,16 +25,14 @@ set(SRC_FILES
   "net.c"
   "cert.c"
   "uri.c"
-  "util.c")
+  "util.c"
+  "signals.c")
 
 # set default compile flags
 set(CMAKE_C_FLAGS_DEBUG
   "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -ggdb")
 set(CMAKE_C_FLAGS_RELEASE
   "${CMAKE_C_FLAGS_RELEASE} -ffunction-sections -flto -O2 -fmerge-all-constants -fdata-sections")
-
-# libmicrohttpd requires this
-set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 # add external library directory
 add_subdirectory(${MOONGEM_LIB_DIR})

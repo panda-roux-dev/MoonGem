@@ -10,6 +10,7 @@
 #include "gemini.h"
 #include "log.h"
 #include "status.h"
+#include "uri.h"
 
 #define LIBRARY_TABLE_NAME "mg"
 
@@ -188,7 +189,7 @@ static void append_package_path(script_ctx_t* ctx) {
   lua_setfield(L, -2, "path");
 }
 
-script_ctx_t* create_script_ctx(gemini_state_t* gemini) {
+script_ctx_t* create_script_ctx(gemini_context_t* gemini) {
   script_ctx_t* ctx = calloc(1, sizeof(script_ctx_t));
   if (ctx == NULL) {
     LOG_ERROR("Failed to allocate space for the script context");

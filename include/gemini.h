@@ -1,13 +1,10 @@
 #ifndef GEMINI_H
 #define GEMINI_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "log.h"
-#include "net.h"
-#include "options.h"
-#include "uri.h"
-#include "util.h"
 
 #define RESPONSE_META_SIZE 128
 #define RESPONSE_MIMETYPE_SIZE 32
@@ -32,7 +29,14 @@
 #define response_has_lang(resp) ((resp)->language[0] != '\0')
 #define response_has_mime(resp) ((resp)->mimetype[0] != '\0')
 
+struct event_base;      // defined in libevent2
+struct evconnlistener;  // defined in libevent2
+
 typedef struct client_cert_t client_cert_t;
+typedef struct uri_t uri_t;
+typedef struct cli_options_t cli_options_t;
+typedef struct cli_options_t cli_options_t;
+typedef struct gemini_listener_t gemini_listener_t;
 
 typedef struct request_t {
   client_cert_t* cert;
@@ -47,12 +51,15 @@ typedef struct response_t {
   bool interrupted;
 } response_t;
 
-typedef struct gemini_state_t {
+typedef struct gemini_context_t {
   request_t request;
   response_t response;
-} gemini_state_t;
+} gemini_context_t;
 
-void listen_for_gemini_requests(cli_options_t* options);
+gemini_listener_t* init_gemini_listener(cli_options_t* options,
+                                        struct event_base* evtbase);
+
+void cleanup_gemini_listener(gemini_listener_t* gemini);
 
 void set_response_status(response_t* response, int code, const char* meta);
 

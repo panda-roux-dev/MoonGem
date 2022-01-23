@@ -7,6 +7,7 @@
 #include "log.h"
 #include "script.h"
 #include "status.h"
+#include "uri.h"
 
 #define LINK_TOKEN "=>"
 #define HEADER_TOKEN "#"

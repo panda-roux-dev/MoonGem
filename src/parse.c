@@ -8,6 +8,7 @@
 #include "log.h"
 #include "script.h"
 #include "status.h"
+#include "util.h"
 
 #define SCRIPT_BEGIN_TOKEN "{{"
 #define SCRIPT_END_TOKEN "}}"
@@ -56,7 +57,7 @@ int init_parser_regex(void) {
 
 void cleanup_parser_regex(void) { regfree(&parser_regexp); }
 
-parser_t* create_doc_parser(gemini_state_t* gemini, file_info_t* file) {
+parser_t* create_doc_parser(gemini_context_t* gemini, file_info_t* file) {
   parser_t* parser = (parser_t*)malloc(sizeof(parser_t));
   parser->gemini = gemini;
   parser->file = file;

@@ -1,11 +1,11 @@
 #include <errno.h>
+#include <event2/event.h>
 #include <unistd.h>
 
 #include "gemini.h"
 #include "log.h"
 #include "options.h"
-#include "parse.h"
-#include "uri.h"
+#include "signals.h"
 
 int main(int argc, const char** argv) {
   cli_options_t* options = parse_options(argc, argv);
@@ -25,22 +25,34 @@ int main(int argc, const char** argv) {
     chdir(options->root);
   }
 
-  // compile the URI regex
-  if (init_uri_regex() != 0) {
+  struct event_base* evtbase = event_base_new();
+  if (evtbase == NULL) {
+    LOG_ERROR("Failed to initialize event handler state");
     return EXIT_FAILURE;
   }
 
-  // compile the parser regex
-  if (init_parser_regex() != 0) {
+  struct event** evts = init_signal_handlers(evtbase);
+  if (evts == NULL) {
+    LOG_ERROR("Failed to initialize signal handlers");
+    event_base_free(evtbase);
     return EXIT_FAILURE;
   }
 
-  // control flow blocks here until the gemini thread terminates
-  listen_for_gemini_requests(options);
+  gemini_listener_t* gemini = init_gemini_listener(options, evtbase);
+  if (gemini == NULL) {
+    LOG_ERROR("Failed to initialize gemini listener");
+    cleanup_signal_handlers(evts);
+    event_base_free(evtbase);
+  }
+
+  // block while requests are handled
+  event_base_dispatch(evtbase);
+
+  cleanup_gemini_listener(gemini);
+  cleanup_signal_handlers(evts);
+  event_base_free(evtbase);
 
   destroy_options(options);
-  cleanup_uri_regex();
-  cleanup_parser_regex();
 
   return EXIT_SUCCESS;
 }

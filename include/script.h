@@ -16,7 +16,7 @@ typedef struct script_ctx_t script_ctx_t;
 
 typedef enum script_result_t { SCRIPT_OK, SCRIPT_ERROR } script_result_t;
 
-script_ctx_t* create_script_ctx(gemini_state_t* gemini);
+script_ctx_t* create_script_ctx(gemini_context_t* gemini);
 
 void destroy_script(script_ctx_t* ctx);
 
