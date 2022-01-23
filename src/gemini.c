@@ -27,7 +27,6 @@
 #define MIMETYPE_GEMTEXT "text/gemini; encoding=utf-8"
 #define DEFAULT_MIMETYPE "application/octet-stream"
 
-#define SIGNAL_HANDLERS_COUNT 4
 #define LISTENER_EVFLAGS \
   (LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC)
 
