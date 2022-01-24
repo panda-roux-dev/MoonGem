@@ -57,11 +57,13 @@ int init_parser_regex(void) {
 
 void cleanup_parser_regex(void) { regfree(&parser_regexp); }
 
-parser_t* create_doc_parser(gemini_context_t* gemini, file_info_t* file) {
+parser_t* create_doc_parser(gemini_context_t* gemini, file_info_t* file,
+                            script_ctx_t* script_ctx) {
   parser_t* parser = (parser_t*)malloc(sizeof(parser_t));
   parser->gemini = gemini;
   parser->file = file;
-  parser->script_ctx = NULL;
+  parser->script_ctx =
+      script_ctx;  // may be NULL if no pre-request script was run
 
   return parser;
 }
@@ -117,7 +119,9 @@ done:
 
 void destroy_doc_parser(parser_t* parser) {
   if (parser != NULL) {
-    destroy_script(parser->script_ctx);
+    // don't free the script context here; we may need to use it for post- or
+    // error-response scripts
+
     free(parser);
   }
 }

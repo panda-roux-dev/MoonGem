@@ -21,6 +21,9 @@
 
 #define STATUS_DEFAULT STATUS_SUCCESS
 
+#define STATUS_IS_ERROR(value) \
+  (value >= STATUS_TEMPORARY_FAILURE && value <= STATUS_BAD_REQUEST)
+
 #define META_INPUT "Input Required"
 #define META_SENSITIVE_INPUT "Input Required"
 #define META_SERVER_UNAVAILABLE "Server Unavailable"

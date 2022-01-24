@@ -21,7 +21,8 @@ int init_parser_regex(void);
 
 void cleanup_parser_regex(void);
 
-parser_t* create_doc_parser(gemini_context_t* gemini, file_info_t* file);
+parser_t* create_doc_parser(gemini_context_t* gemini, file_info_t* file,
+                            script_ctx_t* script_ctx);
 
 void parse_gemtext_doc(parser_t* parser, struct evbuffer* buffer);
 

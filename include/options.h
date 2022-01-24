@@ -9,6 +9,9 @@ typedef struct cli_options_t {
   char* root;
   char* cert_path;
   char* key_path;
+  char* pre_script_path;
+  char* post_script_path;
+  char* error_script_path;
 } cli_options_t;
 
 cli_options_t* parse_options(int argc, const char** argv);

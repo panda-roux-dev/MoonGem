@@ -23,4 +23,7 @@ void destroy_script(script_ctx_t* ctx);
 script_result_t exec_script(script_ctx_t* ctx, char* script, size_t script_len,
                             struct evbuffer* output);
 
+script_result_t exec_script_file(script_ctx_t* ctx, const char* path,
+                                 struct evbuffer* output);
+
 #endif

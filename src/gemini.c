@@ -1,5 +1,7 @@
 #include "gemini.h"
 
+#include "script.h"
+
 #define GNU_SOURCE
 
 #include <event2/buffer.h>
@@ -44,6 +46,7 @@ typedef struct context_t {
   SSL* ssl;
   cli_options_t* options;
   struct magic_set* magic;
+  script_ctx_t* script_ctx;
 } context_t;
 
 static client_cert_t* create_client_cert() {
@@ -90,6 +93,30 @@ static void event_cb(struct bufferevent* bev, short evt, void* data) {
 }
 
 static void end_response_cb(struct bufferevent* bev, void* data) {
+  context_t* ctx = (context_t*)data;
+  cli_options_t* options = ctx->options;
+
+  // run post-response or error scripts if applicable
+  if (options->post_script_path != NULL &&
+      !STATUS_IS_ERROR(ctx->gemini.response.status)) {
+    if (ctx->script_ctx == NULL) {
+      ctx->script_ctx = create_script_ctx(&ctx->gemini);
+    }
+
+    exec_script_file(ctx->script_ctx, options->post_script_path, ctx->out);
+  } else if (options->post_script_path != NULL &&
+             STATUS_IS_ERROR(ctx->gemini.response.status)) {
+    if (ctx->script_ctx == NULL) {
+      ctx->script_ctx = create_script_ctx(&ctx->gemini);
+    }
+
+    exec_script_file(ctx->script_ctx, options->error_script_path, ctx->out);
+  }
+
+  if (ctx->script_ctx != NULL) {
+    destroy_script(ctx->script_ctx);
+  }
+
   bufferevent_flush(bev, EV_WRITE, BEV_FINISHED);
   bufferevent_trigger_event(bev, BEV_EVENT_EOF | BEV_EVENT_WRITING, 0);
 }
@@ -174,9 +201,15 @@ static void send_script_response(context_t* ctx, struct bufferevent* bev) {
   LOG_DEBUG("Sending gemtext response");
 
   // parse the gemtext file and run any scripts found within
-  parser_t* parser = create_doc_parser(&ctx->gemini, &ctx->file);
+  parser_t* parser =
+      create_doc_parser(&ctx->gemini, &ctx->file, ctx->script_ctx);
   struct evbuffer* rendered = evbuffer_new();
   parse_gemtext_doc(parser, rendered);
+
+  // store a reference to the script context so that we can use it for running
+  // post- or error-response scripts if needed
+  ctx->script_ctx = parser->script_ctx;
+
   destroy_doc_parser(parser);
 
   if (res->interrupted || res->status != STATUS_DEFAULT) {
@@ -241,7 +274,6 @@ static void read_cb(struct bufferevent* bev, void* data) {
   context_t* ctx = (context_t*)data;
   request_t* req = &ctx->gemini.request;
   response_t* res = &ctx->gemini.response;
-  file_info_t* file = &ctx->file;
 
   // read the entire request into a buffer
   char request_buffer[MAX_URL_LENGTH + 2] = {0};
@@ -261,25 +293,45 @@ static void read_cb(struct bufferevent* bev, void* data) {
       req->cert = cert;
     }
 
-    // check whether the requested file exists
-    struct stat st;
-    if (stat(req->uri->path, &st) != 0 || !S_ISREG(st.st_mode)) {
-      LOG_DEBUG("File %s does not exist", req->uri->path);
-      set_response_status(res, STATUS_NOT_FOUND, META_NOT_FOUND);
-    } else {
-      LOG_DEBUG("File %s exists", req->uri->path);
-      file->ptr = fopen(req->uri->path, "rb");
-      if (file->ptr == NULL) {
-        LOG_ERROR("Failed to open file at \"%s\"", req->uri->path);
+    cli_options_t* options = ctx->options;
 
-        // if we can't open the file, it may be due to being denied permissions,
-        // which is may have been intentional if the host doesn't want the files
-        // to be served; tell the client they don't exist
+    // try to run a pre-request script if applicable
+    bool pre_script_failed = false;
+    if (options->pre_script_path != NULL) {
+      ctx->script_ctx = create_script_ctx(&ctx->gemini);
+      if (exec_script_file(ctx->script_ctx, options->pre_script_path,
+                           ctx->out) != SCRIPT_OK) {
+        pre_script_failed = true;
+        set_response_status(res, STATUS_CGI_ERROR, META_CGI_ERROR);
+        LOG_ERROR(
+            "An error occurred during the pre-request script; bypassing the "
+            "rest of the response");
+      }
+    }
+
+    // if the pre-response script neither failed nor handled the request on its
+    // own in some other way, continue handling the request
+    if (!pre_script_failed && !res->interrupted) {
+      struct stat st;
+      if (stat(req->uri->path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        LOG_DEBUG("File %s does not exist", req->uri->path);
         set_response_status(res, STATUS_NOT_FOUND, META_NOT_FOUND);
       } else {
-        // file exists and was opened successfully
-        file->fd = fileno(file->ptr);
-        file->size = st.st_size;
+        LOG_DEBUG("File %s exists", req->uri->path);
+        file_info_t* file = &ctx->file;
+        file->ptr = fopen(req->uri->path, "rb");
+        if (file->ptr == NULL) {
+          LOG_ERROR("Failed to open file at \"%s\"", req->uri->path);
+
+          // if we can't open the file, it may be due to being denied
+          // permissions, which is may have been intentional if the host doesn't
+          // want the files to be served; tell the client they don't exist
+          set_response_status(res, STATUS_NOT_FOUND, META_NOT_FOUND);
+        } else {
+          // file exists and was opened successfully
+          file->fd = fileno(file->ptr);
+          file->size = st.st_size;
+        }
       }
     }
   }
@@ -313,6 +365,7 @@ static void listener_cb(struct evconnlistener* listener, evutil_socket_t fd,
   ctx->gemini.response.status = STATUS_DEFAULT;
   ctx->magic = gemini->magic;
   ctx->options = gemini->options;
+  ctx->script_ctx = NULL;
 
   bufferevent_setcb(bev, read_cb, NULL, event_cb, ctx);
   bufferevent_enable(bev, EV_READ);

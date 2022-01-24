@@ -78,6 +78,17 @@ The start and end of script sections are indicated with a double curly-braces.
 
 All of the MoonGem-defined functionality is contained within a table called `mg`.
 
+### Pre-Request
+
+These methods are only accessible from pre-request scripts.
+
+- `mg.set_path(<new-path>)
+    - Sets the value of the incoming request path, overriding the initial value
+    - This can be useful for implementing virtual directories and other URL-reinterpretation features
+- `mg.interrupt()`
+    - Instructs MoonGem to bypass the rest of the requet-handling pipeline and use the current response state
+    - Unless otherwise set, the default response status code will be 20 (OK)
+
 ### Body
 
 These methods modify the body of the Gemini page.
@@ -89,8 +100,8 @@ These methods modify the body of the Gemini page.
     - Writes `text` to the page
 - `mg.line([text])`
     - Writes `text` to the page followed by a line break
-- `mg.link(<uri>, [text])`
-    - Writes a link to `uri` on the page, and optionally includes the alt-text `text`
+- `mg.link(<url>, [text])`
+    - Writes a link to `url` on the page, and optionally includes the alt-text `text`
 - `mg.head(<text>, [level])`
     - Writes a header line containing `text` to the page, with an optional header level
     - The default header level is 1 (i.e. a single '#' character)
@@ -112,6 +123,9 @@ If a method is called which modifies the response's status code (which all but t
 
 - `mg.set_language(<language>)`
     - Sets the `lang` portion of the response header, indicating the language(s) that the page is written in
+- `mg.success()`
+    - Sets the response status code to 20 (OK)
+    - Only really useful in pre- and post-request scripts
 - `mg.temp_redirect(<url>)`
     - Responds with a code-30 temporary redirect to `url`
 - `mg.redirect(<url>)`
@@ -135,8 +149,10 @@ If a method is called which modifies the response's status code (which all but t
 
 These methods are concerned with handling user-input.
 
+- `mg.get_path()`
+    - Returns the path portion of the requested URL
 - `mg.get_input([meta])`
-    - If an input argument was included in the request URI, this method returns that value
+    - If an input argument was included in the request URL, this method returns that value
     - If no input was provided in the request, then the server responds with a code-10 status response and optional `meta` string
 - `mg.get_sensitive_input([meta])`
     - Same as `mg.get_input`, but uses status code 11

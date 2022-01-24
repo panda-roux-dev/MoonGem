@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#define URI_PATH_MAX 1024
+
 typedef enum uri_type_t { URI_TYPE_GEMTEXT, URI_TYPE_FILE } uri_type_t;
 
 typedef struct uri_t {

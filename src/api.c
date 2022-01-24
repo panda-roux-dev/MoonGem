@@ -15,6 +15,7 @@
 #define BLOCK_TOKEN "```"
 #define SPACE " "
 #define NEWLINE "\n"
+#define PATH_DEFAULT "/"
 
 #define FLD_CERT_FINGERPRINT "fingerprint"
 #define FLD_CERT_EXPIRATION "not_after"
@@ -24,6 +25,32 @@ static void set_interrupt_response(response_t* response, int status,
   response->interrupted = true;
   response->status = status;
   set_response_meta(response, meta);
+}
+
+int api_set_path(lua_State* L) {
+  lua_settop(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
+  request_t* request = (request_t*)lua_touserdata(L, -1);
+
+  if (!lua_isnoneornil(L, 1)) {
+    if (request->uri->path != NULL) {
+      free(request->uri->path);
+    }
+
+    request->uri->path = strndup(lua_tostring(L, 1), URI_PATH_MAX);
+  } else {
+    request->uri->path = strdup(PATH_DEFAULT);
+  }
+
+  return 0;
+}
+
+int api_interrupt(lua_State* L) {
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+  response->interrupted = true;
+  return 0;
 }
 
 int api_set_lang(lua_State* L) {
@@ -104,6 +131,13 @@ int api_get_path(lua_State* L) {
   }
 
   return 1;
+}
+
+int api_success(lua_State* L) {
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+  set_response_status(response, STATUS_SUCCESS, NULL);
+  return 0;
 }
 
 int api_temp_redirect(lua_State* L) {

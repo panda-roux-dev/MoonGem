@@ -14,6 +14,9 @@
 
 #define LIBRARY_TABLE_NAME "mg"
 
+#define FUNC_SET_PATH "set_path"
+#define FUNC_INTERRUPT "interrupt"
+
 #define FUNC_INPUT "get_input"
 #define FUNC_INPUT_SENSITIVE "get_sensitive_input"
 #define FUNC_HAS_INPUT "has_input"
@@ -23,6 +26,7 @@
 #define FUNC_HAS_CERT "has_cert"
 
 #define FUNC_LANG "set_language"
+#define FUNC_SUCCESS "success"
 #define FUNC_TEMP_REDIRECT "temp_redirect"
 #define FUNC_REDIRECT "redirect"
 #define FUNC_TEMP_FAILURE "temp_failure"
@@ -58,6 +62,10 @@ typedef struct script_ctx_t {
   response_t* response;
 } script_ctx_t;
 
+/* Pre-Request */
+int api_set_path(lua_State* L);
+int api_interrupt(lua_State* L);
+
 /* Input */
 int api_get_input(lua_State* L);
 int api_get_input_sensitive(lua_State* L);
@@ -70,6 +78,7 @@ int api_has_cert(lua_State* L);
 
 /* Response */
 int api_set_lang(lua_State* L);
+int api_success(lua_State* L);
 int api_temp_redirect(lua_State* L);
 int api_perm_redirect(lua_State* L);
 int api_temp_failure(lua_State* L);
@@ -97,7 +106,10 @@ int api_beginblock(lua_State* L);
 int api_endblock(lua_State* L);
 
 static void set_api_methods(lua_State* L) {
-  luaL_Reg methods[] = {{FUNC_INPUT, api_get_input},
+  luaL_Reg methods[] = {{FUNC_SET_PATH, api_set_path},
+                        {FUNC_INTERRUPT, api_interrupt},
+
+                        {FUNC_INPUT, api_get_input},
                         {FUNC_INPUT_SENSITIVE, api_get_input_sensitive},
                         {FUNC_HAS_INPUT, api_has_input},
                         {FUNC_GET_PATH, api_get_path},
@@ -107,6 +119,7 @@ static void set_api_methods(lua_State* L) {
 
                         {FUNC_LANG, api_set_lang},
                         {FUNC_REDIRECT, api_perm_redirect},
+                        {FUNC_SUCCESS, api_success},
                         {FUNC_TEMP_REDIRECT, api_temp_redirect},
                         {FUNC_TEMP_FAILURE, api_temp_failure},
                         {FUNC_UNAVAILABLE, api_unavailable},
@@ -234,8 +247,6 @@ script_result_t exec_script(script_ctx_t* ctx, char* script, size_t script_len,
 
   set_response_buffer(L, output);
 
-  script_result_t result = SCRIPT_OK;
-
   // we have to copy the script body to a buffer so that we can null-terminate
   // it, as the Lua API doesn't provide a way to run a string with an explicit
   // length
@@ -244,18 +255,45 @@ script_result_t exec_script(script_ctx_t* ctx, char* script, size_t script_len,
 
   lua_pop(L, lua_gettop(L));
   if (luaL_dostring(L, &global_script_buffer[0]) != LUA_OK) {
-    LOG_ERROR("Error running Lua script: %s", lua_tostring(L, -1));
-    result = SCRIPT_ERROR;
-  } else {
-    LOG_DEBUG("Ran a script of length %zu", script_len);
-
-    // if the script returned a string, write it to the buffer because that's
-    // nice
-    if (lua_gettop(L) > 0 && lua_isstring(L, -1)) {
-      const char* text = lua_tostring(L, -1);
-      evbuffer_add_printf(output, "%s", text);
+    if (lua_isstring(L, -1)) {
+      LOG_ERROR("Error running script: %s", lua_tostring(L, -1));
+    } else {
+      LOG_ERROR("Error running script");
     }
+
+    return SCRIPT_ERROR;
   }
 
-  return result;
+  LOG_DEBUG("Ran a script of length %zu", script_len);
+
+  // if the script returned a string, write it to the buffer because that's
+  // nice
+  if (lua_gettop(L) > 0 && lua_isstring(L, -1)) {
+    const char* text = lua_tostring(L, -1);
+    evbuffer_add_printf(output, "%s", text);
+  }
+
+  return SCRIPT_OK;
+}
+
+script_result_t exec_script_file(script_ctx_t* ctx, const char* path,
+                                 struct evbuffer* output) {
+  lua_State* L = ctx->L;
+
+  set_response_buffer(L, output);
+
+  if (luaL_dofile(ctx->L, path) != LUA_OK) {
+    if (lua_isstring(L, -1)) {
+      LOG_ERROR("Error running script file at %s: %s", path,
+                lua_tostring(L, -1));
+    } else {
+      LOG_ERROR("Error running script file at %s", path);
+    }
+
+    return SCRIPT_ERROR;
+  }
+
+  LOG_DEBUG("Ran script at %s", path);
+
+  return SCRIPT_OK;
 }

@@ -35,6 +35,9 @@ cli_options_t* parse_options(int argc, const char** argv) {
   const char* root = NULL;
   const char* cert_path = NULL;
   const char* key_path = NULL;
+  const char* pre_script_path = NULL;
+  const char* post_script_path = NULL;
+  const char* error_script_path = NULL;
 
   struct argparse_option options_config[] = {
       OPT_HELP(),
@@ -52,6 +55,15 @@ cli_options_t* parse_options(int argc, const char** argv) {
       OPT_INTEGER('u', "chunk", &options->chunk_size,
                   "size in bytes of the chunks loaded into memory while "
                   "serving static files (default: 16384)"),
+      OPT_GROUP("Middleware"),
+      OPT_STRING('b', "before", &pre_script_path,
+                 "script to be run before each request is handled"),
+      OPT_STRING('a', "after", &post_script_path,
+                 "script to be run after a request has "
+                 "resulted in a success response code (20)"),
+      OPT_STRING('e', "error", &error_script_path,
+                 "script to be run after a request has resulted "
+                 "in an error response code (40 thru 59)"),
       OPT_END(),
   };
 
@@ -68,7 +80,7 @@ cli_options_t* parse_options(int argc, const char** argv) {
 
   options->cert_path = realpath(cert_path, NULL);
   if (options->cert_path == NULL) {
-    perror("Invalid certificate path");
+    LOG_ERROR("Invalid certificate path");
     goto failure;
   }
 
@@ -80,15 +92,39 @@ cli_options_t* parse_options(int argc, const char** argv) {
 
   options->key_path = realpath(key_path, NULL);
   if (options->key_path == NULL) {
-    perror("Invalid key path");
+    LOG_ERROR("Invalid key path");
     goto failure;
   }
 
   if (root != NULL) {
     options->root = realpath(root, NULL);
     if (options->root == NULL) {
-      perror("Invalid root path");
-      return NULL;
+      LOG_ERROR("Invalid root path");
+      goto failure;
+    }
+  }
+
+  if (pre_script_path != NULL) {
+    options->pre_script_path = realpath(pre_script_path, NULL);
+    if (options->pre_script_path == NULL) {
+      LOG_ERROR("Invalid pre-request script path");
+      goto failure;
+    }
+  }
+
+  if (post_script_path != NULL) {
+    options->post_script_path = realpath(post_script_path, NULL);
+    if (options->post_script_path == NULL) {
+      LOG_ERROR("Invalid post-request script path");
+      goto failure;
+    }
+  }
+
+  if (error_script_path != NULL) {
+    options->error_script_path = realpath(error_script_path, NULL);
+    if (options->error_script_path == NULL) {
+      LOG_ERROR("Invalid error script path");
+      goto failure;
     }
   }
 
