@@ -21,8 +21,6 @@
 #define URI_PATH 4
 #define URI_INPUT 5
 
-#define URI_PATH_MAX 1024
-
 static regex_t uri_regexp;
 static char regex_error[512] = {0};
 
