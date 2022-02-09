@@ -68,6 +68,11 @@ Network
 Content
     -r, --root=<str>      root directory from which to serve content (default: current)
     -c, --chunk=<int>     size in bytes of the chunks loaded into memory while serving static files (default: 16384)
+
+Middleware
+    -b, --before=<str>    script to be run before each request is handled
+    -a, --after=<str>     script to be run after a request has resulted in a success response code (20)
+    -e, --error=<str>     script to be run after a request has resulted in an error response code (40 thru 59)
 ```
 
 ## API
