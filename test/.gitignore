@@ -1,0 +1,4 @@
+*.pem
+env/
+__pycache__
+.known_hosts
