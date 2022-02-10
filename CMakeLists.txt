@@ -1,12 +1,11 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(moongem VERSION 0.1.0 LANGUAGES C)
+project(moongem VERSION 2.0.0 LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # default to Release-mode
 if(NOT CMAKE_BUILD_TYPE)
-  message(STATUS "No build type specified, defaulting to Release")
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 endif()
 
@@ -79,17 +78,3 @@ if(DISABLE_LOGGING)
 endif()
 
 install(TARGETS ${MOONGEM_EXE} DESTINATION bin)
-
-# set(TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/test")
-# set(TEST_CERT_FILES "${TEST_DIR}/cert.pem" "${TEST_DIR}/key.pem")
-# add_custom_command(
-#   OUTPUT TEST_CERT_FILES
-#   COMMAND "openssl req -x509 -newkey rsa:4096 -keyout ${TEST_DIR}/key.pem -out ${TEST_DIR}/cert.pem -days 3650 -nodes -subj \"/CN=localhost\""
-#   COMMENT "Generating certificates for use during testing")
-# add_custom_target(test
-#   DEPENDS TEST_CERT_FILES ${MOONGEM_EXE}
-#   WORKING_DIRECTORY ${TEST_DIR}
-#   COMMAND "${TEST_DIR}/run-tests.sh ${CMAKE_BINARY_DIR}/${MOONGEM_EXE} ${TEST_DIR}/cert.pem ${TEST_DIR}/key.pem ${TEST_DIR}/root"
-#   COMMENT "Running tests")
-
-
