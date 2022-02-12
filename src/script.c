@@ -190,9 +190,11 @@ static void append_package_path(script_ctx_t* ctx) {
   lua_getglobal(L, "package");
   lua_getfield(L, -1, "path");
   if (strrchr(path, '.') != NULL) {
-    char* dir = dirname((char*)path);
+    char* path_copy = strdup(path);
+    char* dir = dirname(path_copy);
     lua_pushfstring(L, ";./%s/?.lua", dir);
     lua_pushfstring(L, ";./%s/?", dir);
+    free(dir);
   } else {
     lua_pushfstring(L, ";./%s/?.lua", path);
     lua_pushfstring(L, ";./%s/?", path);
