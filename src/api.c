@@ -75,13 +75,9 @@ int api_get_input(lua_State* L) {
   if (lua_isnoneornil(L, -1)) {
     lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
     response_t* response = (response_t*)lua_touserdata(L, -1);
+    const char* meta = luaL_optstring(L, 1, META_INPUT);
 
-    if (lua_isnoneornil(L, 1)) {
-      set_interrupt_response(response, STATUS_INPUT, META_INPUT);
-    } else {
-      const char* prompt = luaL_checkstring(L, 1);
-      set_interrupt_response(response, STATUS_INPUT, prompt);
-    }
+    set_interrupt_response(response, STATUS_INPUT, meta);
 
     return 0;
   }
@@ -96,14 +92,9 @@ int api_get_input_sensitive(lua_State* L) {
   if (lua_isnoneornil(L, -1)) {
     lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
     response_t* response = (response_t*)lua_touserdata(L, -1);
+    const char* meta = luaL_optstring(L, 1, META_SENSITIVE_INPUT);
 
-    if (lua_isnoneornil(L, 1)) {
-      set_interrupt_response(response, STATUS_SENSITIVE_INPUT,
-                             META_SENSITIVE_INPUT);
-    } else {
-      const char* prompt = luaL_checkstring(L, 1);
-      set_interrupt_response(response, STATUS_SENSITIVE_INPUT, prompt);
-    }
+    set_interrupt_response(response, STATUS_INPUT, meta);
 
     return 0;
   }
@@ -114,7 +105,7 @@ int api_get_input_sensitive(lua_State* L) {
 int api_has_input(lua_State* L) {
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_INPUT);
   if (lua_isnoneornil(L, -1)) {
-    lua_pushboolean(L, false);
+    lua_pushboolean(L, true);
   } else {
     lua_pushboolean(L, true);
   }
@@ -146,6 +137,7 @@ int api_temp_redirect(lua_State* L) {
   lua_settop(L, 1);
 
   const char* uri = luaL_checkstring(L, 1);
+
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
   set_interrupt_response(response, STATUS_TEMPORARY_REDIRECT, uri);
@@ -166,7 +158,7 @@ int api_perm_redirect(lua_State* L) {
 int api_temp_failure(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_TEMPORARY_FAILURE);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -179,7 +171,7 @@ int api_temp_failure(lua_State* L) {
 int api_unavailable(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_SERVER_UNAVAILABLE);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -192,7 +184,7 @@ int api_unavailable(lua_State* L) {
 int api_cgi_error(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_CGI_ERROR);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -205,7 +197,7 @@ int api_cgi_error(lua_State* L) {
 int api_proxy_error(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_PROXY_ERROR);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -218,7 +210,7 @@ int api_proxy_error(lua_State* L) {
 int api_slow_down(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_SLOW_DOWN);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -231,7 +223,7 @@ int api_slow_down(lua_State* L) {
 int api_perm_failure(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_PERMANENT_FAILURE);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -244,7 +236,7 @@ int api_perm_failure(lua_State* L) {
 int api_not_found(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_NOT_FOUND);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -257,7 +249,7 @@ int api_not_found(lua_State* L) {
 int api_gone(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_GONE);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -270,7 +262,7 @@ int api_gone(lua_State* L) {
 int api_proxy_refused(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_PROXY_REQUEST_REFUSED);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -283,7 +275,7 @@ int api_proxy_refused(lua_State* L) {
 int api_bad_request(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_BAD_REQUEST);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -296,7 +288,7 @@ int api_bad_request(lua_State* L) {
 int api_cert_required(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_CLIENT_CERTIFICATE_REQUIRED);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -309,7 +301,7 @@ int api_cert_required(lua_State* L) {
 int api_cert_unauthorized(lua_State* L) {
   lua_settop(L, 1);
 
-  const char* meta = luaL_checkstring(L, 1);
+  const char* meta = luaL_optstring(L, 1, META_CERTIFICATE_NOT_AUTHORIZED);
 
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
@@ -331,14 +323,9 @@ int api_get_cert(lua_State* L) {
     lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
     response_t* response = (response_t*)lua_touserdata(L, -1);
 
-    if (lua_isnoneornil(L, 1)) {
-      set_interrupt_response(response, STATUS_CLIENT_CERTIFICATE_REQUIRED,
-                             META_CLIENT_CERTIFICATE_REQUIRED);
-    } else {
-      const char* prompt = luaL_checkstring(L, 1);
-      set_interrupt_response(response, STATUS_CLIENT_CERTIFICATE_REQUIRED,
-                             prompt);
-    }
+    const char* prompt = luaL_optstring(L, 1, META_CLIENT_CERTIFICATE_REQUIRED);
+    set_interrupt_response(response, STATUS_CLIENT_CERTIFICATE_REQUIRED,
+                           prompt);
 
     return 0;
   }
