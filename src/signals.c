@@ -18,12 +18,15 @@ static void signal_continue_cb(evutil_socket_t sig, short events, void* data) {
   event_base_loopcontinue((struct event_base*)data);
 }
 
+static void signal_ignore_cb(evutil_socket_t sig, short events, void* data) {}
+
 typedef struct {
   event_callback_fn cb;
   short signal;
 } sigcb_t;
 
 static sigcb_t callbacks[] = {{signal_shutdown_cb, SIGINT},
+                              {signal_ignore_cb, SIGPIPE},
                               {signal_shutdown_cb, SIGTERM},
                               {signal_termstop_cb, SIGTSTP},
                               {signal_continue_cb, SIGCONT}};
