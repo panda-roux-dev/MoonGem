@@ -1,6 +1,7 @@
 #include "uri.h"
 
 #include <pcre2posix.h>
+#include <string.h>
 
 #include "log.h"
 #include "util.h"

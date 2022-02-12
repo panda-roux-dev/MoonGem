@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <event2/event.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "gemini.h"
