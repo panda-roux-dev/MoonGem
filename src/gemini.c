@@ -42,6 +42,7 @@ typedef struct gemini_listener_t {
 typedef struct context_t {
   gemini_context_t gemini;
   file_info_t file;
+  struct evbuffer* early;
   struct evbuffer* out;
   SSL* ssl;
   cli_options_t* options;
@@ -80,6 +81,10 @@ static void event_cb(struct bufferevent* bev, short evt, void* data) {
       }
 
       evbuffer_free(ctx->out);
+
+      if (ctx->early != NULL) {
+        evbuffer_free(ctx->early);
+      }
 
       if (ctx->file.ptr != NULL) {
         fclose(ctx->file.ptr);
@@ -224,6 +229,12 @@ static void send_script_response(context_t* ctx, struct bufferevent* bev) {
 
   // write the response header to a buffer, followed by the rendered gemtext
   write_header(ctx);
+
+  // if the pre-request script wrote anything, then include that
+  if (ctx->early != NULL) {
+    evbuffer_add_buffer(ctx->out, ctx->early);
+  }
+
   evbuffer_add_buffer(ctx->out, rendered);
   evbuffer_free(rendered);
 
@@ -250,17 +261,43 @@ static void send_file_response(context_t* ctx, struct bufferevent* bev) {
 
   // write response header
   write_header(ctx);
+
+  // if the pre-request script wrote anything, then include that
+  if (ctx->early != NULL) {
+    evbuffer_add_buffer(ctx->out, ctx->early);
+  }
+
   bufferevent_write_buffer(bev, ctx->out);
 
   // serve the file
   bufferevent_setcb(bev, NULL, serve_static_file_cb, event_cb, ctx);
 }
 
+static void send_early_response(context_t* ctx, struct bufferevent* bev) {
+  if (ctx->early == NULL) {
+    return;
+  }
+
+  LOG_DEBUG("Pre-request script bypassed the rest of the response pipeline");
+
+  // write response header
+  write_header(ctx);
+
+  // all we should have is the pre-response script's output buffer, so just
+  // write that and end the response
+  evbuffer_add_buffer(ctx->out, ctx->early);
+
+  bufferevent_write_buffer(bev, ctx->out);
+  bufferevent_setcb(bev, NULL, end_response_cb, event_cb, ctx);
+}
+
 static void write_response_cb(struct bufferevent* bev, void* data) {
   context_t* ctx = (context_t*)data;
 
   if (ctx->gemini.response.status == STATUS_DEFAULT) {
-    if (ctx->gemini.request.uri->type == URI_TYPE_GEMTEXT) {
+    if (ctx->gemini.response.interrupted) {
+      send_early_response(ctx, bev);
+    } else if (ctx->gemini.request.uri->type == URI_TYPE_GEMTEXT) {
       send_script_response(ctx, bev);
     } else {
       send_file_response(ctx, bev);
@@ -299,8 +336,9 @@ static void read_cb(struct bufferevent* bev, void* data) {
     bool pre_script_failed = false;
     if (options->pre_script_path != NULL) {
       ctx->script_ctx = create_script_ctx(&ctx->gemini);
+      ctx->early = evbuffer_new();
       if (exec_script_file(ctx->script_ctx, options->pre_script_path,
-                           ctx->out) != SCRIPT_OK) {
+                           ctx->early) != SCRIPT_OK) {
         pre_script_failed = true;
         set_response_status(res, STATUS_CGI_ERROR, META_CGI_ERROR);
         LOG_ERROR(
@@ -366,6 +404,7 @@ static void listener_cb(struct evconnlistener* listener, evutil_socket_t fd,
   ctx->magic = gemini->magic;
   ctx->options = gemini->options;
   ctx->script_ctx = NULL;
+  ctx->early = NULL;
 
   bufferevent_setcb(bev, read_cb, NULL, event_cb, ctx);
   bufferevent_enable(bev, EV_READ);
