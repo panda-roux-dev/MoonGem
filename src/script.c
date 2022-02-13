@@ -191,7 +191,7 @@ static void append_dir_to_package_path(lua_State* L, const char* path) {
     char* dir = dirname(path_copy);
     lua_pushfstring(L, ";./%s/?.lua", dir);
     lua_pushfstring(L, ";./%s/?", dir);
-    free(dir);
+    free(path_copy);
   } else {
     lua_pushfstring(L, ";./%s/?.lua", path);
     lua_pushfstring(L, ";./%s/?", path);
