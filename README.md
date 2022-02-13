@@ -128,6 +128,8 @@ If a method is called which modifies the response's status code (which all but t
 
 - `mg.set_language(<language>)`
     - Sets the `lang` portion of the response header, indicating the language(s) that the page is written in
+- `mg.set_mimetype(<mimetype>)`
+    - Sets the response mimetype string, indicating the type of content being delivered.  The default for gemtext documents is `text/gemini; charset=utf-8`.
 - `mg.success()`
     - Sets the response status code to 20 (OK)
     - Only really useful in pre- and post-request scripts

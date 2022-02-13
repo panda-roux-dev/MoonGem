@@ -26,6 +26,7 @@
 #define FUNC_HAS_CERT "has_cert"
 
 #define FUNC_LANG "set_language"
+#define FUNC_MIMETYPE "set_mimetype"
 #define FUNC_SUCCESS "success"
 #define FUNC_TEMP_REDIRECT "temp_redirect"
 #define FUNC_REDIRECT "redirect"
@@ -78,6 +79,7 @@ int api_has_cert(lua_State* L);
 
 /* Response */
 int api_set_lang(lua_State* L);
+int api_set_mimetype(lua_State* L);
 int api_success(lua_State* L);
 int api_temp_redirect(lua_State* L);
 int api_perm_redirect(lua_State* L);
@@ -118,6 +120,7 @@ static void set_api_methods(lua_State* L) {
                         {FUNC_HAS_CERT, api_has_cert},
 
                         {FUNC_LANG, api_set_lang},
+                        {FUNC_MIMETYPE, api_set_mimetype},
                         {FUNC_REDIRECT, api_perm_redirect},
                         {FUNC_SUCCESS, api_success},
                         {FUNC_TEMP_REDIRECT, api_temp_redirect},

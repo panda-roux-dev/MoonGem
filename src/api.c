@@ -68,6 +68,19 @@ int api_set_lang(lua_State* L) {
   return 0;
 }
 
+int api_set_mimetype(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* mimetype = luaL_checkstring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
+  response_t* response = (response_t*)lua_touserdata(L, -1);
+
+  set_response_mime(response, mimetype);
+
+  return 0;
+}
+
 int api_get_input(lua_State* L) {
   lua_settop(L, 1);
 
