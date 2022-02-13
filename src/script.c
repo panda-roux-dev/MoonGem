@@ -173,23 +173,17 @@ static void set_response_buffer(lua_State* L, struct evbuffer* buffer) {
   lua_setfield(L, LUA_REGISTRYINDEX, FLD_BUFFER);
 }
 
-static void append_package_path(script_ctx_t* ctx) {
-  lua_State* L = ctx->L;
-  const char* path = ctx->request->uri->path;
-
+static void append_dir_to_package_path(lua_State* L, const char* path) {
   if (path == NULL) {
     return;
   }
-
-  /*
-  // skip the first forward-slash
-  ++path;
-  */
 
   // add the request path to package.path
   lua_getglobal(L, "package");
   lua_getfield(L, -1, "path");
   if (strrchr(path, '.') != NULL) {
+    // if this looks like a file, then append the directory that the file is in
+    // rather than the file path itself
     char* path_copy = strdup(path);
     char* dir = dirname(path_copy);
     lua_pushfstring(L, ";./%s/?.lua", dir);
@@ -218,7 +212,6 @@ script_ctx_t* create_script_ctx(gemini_context_t* gemini) {
   ctx->request = &gemini->request;
   ctx->response = &gemini->response;
 
-  append_package_path(ctx);
   set_registry_data(ctx);
   set_api_methods(L);
 
@@ -246,6 +239,8 @@ script_result_t exec_script(script_ctx_t* ctx, char* script, size_t script_len,
   }
 
   lua_State* L = ctx->L;
+
+  append_dir_to_package_path(L, ctx->request->uri->path);
 
   set_response_buffer(L, output);
 
@@ -281,6 +276,8 @@ script_result_t exec_script(script_ctx_t* ctx, char* script, size_t script_len,
 script_result_t exec_script_file(script_ctx_t* ctx, const char* path,
                                  struct evbuffer* output) {
   lua_State* L = ctx->L;
+
+  append_dir_to_package_path(L, path);
 
   set_response_buffer(L, output);
 
