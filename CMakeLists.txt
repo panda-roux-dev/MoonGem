@@ -31,7 +31,7 @@ set(SRC_FILES
 set(CMAKE_C_FLAGS_DEBUG
   "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -ggdb")
 set(CMAKE_C_FLAGS_RELEASE
-  "${CMAKE_C_FLAGS_RELEASE} -ffunction-sections -flto -O2 -fmerge-all-constants -fdata-sections")
+  "${CMAKE_C_FLAGS_RELEASE} -flto -O3")
 
 # add external library directory
 add_subdirectory(${MOONGEM_LIB_DIR})
