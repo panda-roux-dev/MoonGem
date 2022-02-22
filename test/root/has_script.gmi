@@ -1,0 +1,5 @@
+This page has a script.
+
+{{ return "hello world" }}
+
+Here's the end of the page.

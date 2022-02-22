@@ -14,6 +14,6 @@ def exists(response: BaseResponse):
 
 def does_not_exist(response: BaseResponse):
     if response.status != ig.RESPONSE_STATUSDETAIL_PERM_FAILURE_NOT_FOUND:
-        return fail('Resource was found')
+        return fail(f'Response was {response.data()}')
     return ok()
 
