@@ -35,11 +35,12 @@ int api_set_path(lua_State* L) {
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
   request_t* request = (request_t*)lua_touserdata(L, -1);
 
-  if (!lua_isnoneornil(L, 1)) {
-    if (request->uri->path != NULL) {
-      free(request->uri->path);
-    }
+  if (request->uri->path != NULL) {
+    free(request->uri->path);
+    request->uri->path = NULL;
+  }
 
+  if (!lua_isnoneornil(L, 1)) {
     request->uri->path = strndup(lua_tostring(L, 1), URI_PATH_MAX);
   } else {
     request->uri->path = strdup(PATH_DEFAULT);
@@ -52,6 +53,23 @@ int api_interrupt(lua_State* L) {
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_RESPONSE);
   response_t* response = (response_t*)lua_touserdata(L, -1);
   response->interrupted = true;
+  return 0;
+}
+
+int api_set_input(lua_State* L) {
+  lua_settop(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
+  request_t* request = (request_t*)lua_touserdata(L, -1);
+
+  if (!lua_isnoneornil(L, 1)) {
+    lua_pushstring(L, luaL_checkstring(L, 1));
+  } else {
+    lua_pushnil(L);
+  }
+
+  lua_setfield(L, LUA_REGISTRYINDEX, FLD_INPUT);
+
   return 0;
 }
 
@@ -132,6 +150,19 @@ int api_get_path(lua_State* L) {
 
   if (request->uri->path != NULL) {
     lua_pushstring(L, request->uri->path);
+  } else {
+    lua_pushnil(L);
+  }
+
+  return 1;
+}
+
+int api_get_raw_path(lua_State* L) {
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
+  request_t* request = (request_t*)lua_touserdata(L, -1);
+
+  if (request->uri->raw_path != NULL) {
+    lua_pushstring(L, request->uri->raw_path);
   } else {
     lua_pushnil(L);
   }

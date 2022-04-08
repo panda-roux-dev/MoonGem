@@ -11,6 +11,7 @@ typedef struct uri_t {
   char* scheme;
   char* host;
   char* port;
+  char* raw_path;
   char* path;
   char* input;
   uri_type_t type;

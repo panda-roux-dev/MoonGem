@@ -87,9 +87,11 @@ All of the MoonGem-defined functionality is contained within a table called `mg`
 
 These methods are only accessible from pre-request scripts.
 
-- `mg.set_path(<new-path>)
-    - Sets the value of the incoming request path, overriding the initial value
+- `mg.set_path([new-path])`
+    - Overrides the incoming request path with a new value, or `/` if one is not provided
     - This can be useful for implementing virtual directories and other URL-reinterpretation features
+- `mg.set_input([new-input])`
+    - Overrides the incoming request's input string, or removes it if no new value is provided
 - `mg.interrupt()`
     - Instructs MoonGem to bypass the rest of the requet-handling pipeline and use the current response state
     - Unless otherwise set, the default response status code will be 20 (OK)
@@ -158,6 +160,9 @@ These methods are concerned with handling user-input.
 
 - `mg.get_path()`
     - Returns the path portion of the requested URL
+    - This path is standardized to include a default document (index.gmi) if one is not present (see get_raw_path)
+- `mg.get_raw_path()`
+    - Returns the path as requested by the client, prior to standardization
 - `mg.get_input([meta])`
     - If an input argument was included in the request URL, this method returns that value
     - If no input was provided in the request, then the server responds with a code-10 status response and optional `meta` string

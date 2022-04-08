@@ -121,9 +121,10 @@ uri_t* create_uri(const char* buf) {
   uri->scheme = extract_part(&matches[URI_SCHEME], buf);
   uri->host = extract_part(&matches[URI_HOST], buf);
   uri->port = extract_part(&matches[URI_PORT], buf);
-  uri->path = extract_part(&matches[URI_PATH], buf);
+  uri->raw_path = extract_part(&matches[URI_PATH], buf);
   uri->input = extract_part(&matches[URI_INPUT], buf);
 
+  uri->path = strdup(uri->raw_path);
   standardize_path(&uri->path);
 
   // path can be null if EOM occurred trying to add default doc
@@ -153,6 +154,7 @@ void destroy_uri(uri_t* uri) {
   CHECK_FREE(uri->port);
   CHECK_FREE(uri->path);
   CHECK_FREE(uri->input);
+  CHECK_FREE(uri->raw_path);
 
   free(uri);
 }

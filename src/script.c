@@ -16,11 +16,13 @@
 
 #define FUNC_SET_PATH "set_path"
 #define FUNC_INTERRUPT "interrupt"
+#define FUNC_SET_INPUT "set_input"
 
 #define FUNC_INPUT "get_input"
 #define FUNC_INPUT_SENSITIVE "get_sensitive_input"
 #define FUNC_HAS_INPUT "has_input"
 #define FUNC_GET_PATH "get_path"
+#define FUNC_GET_RAW_PATH "get_raw_path"
 
 #define FUNC_CERT "get_cert"
 #define FUNC_HAS_CERT "has_cert"
@@ -66,12 +68,14 @@ typedef struct script_ctx_t {
 /* Pre-Request */
 int api_set_path(lua_State* L);
 int api_interrupt(lua_State* L);
+int api_set_input(lua_State* L);
 
 /* Input */
 int api_get_input(lua_State* L);
 int api_get_input_sensitive(lua_State* L);
 int api_has_input(lua_State* L);
 int api_get_path(lua_State* L);
+int api_get_raw_path(lua_State* L);
 
 /* Certificates */
 int api_get_cert(lua_State* L);
@@ -110,11 +114,13 @@ int api_endblock(lua_State* L);
 static void set_api_methods(lua_State* L) {
   luaL_Reg methods[] = {{FUNC_SET_PATH, api_set_path},
                         {FUNC_INTERRUPT, api_interrupt},
+                        {FUNC_SET_INPUT, api_set_input},
 
                         {FUNC_INPUT, api_get_input},
                         {FUNC_INPUT_SENSITIVE, api_get_input_sensitive},
                         {FUNC_HAS_INPUT, api_has_input},
                         {FUNC_GET_PATH, api_get_path},
+                        {FUNC_GET_RAW_PATH, api_get_raw_path},
 
                         {FUNC_CERT, api_get_cert},
                         {FUNC_HAS_CERT, api_has_cert},
