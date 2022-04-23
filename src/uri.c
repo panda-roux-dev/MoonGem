@@ -124,7 +124,10 @@ uri_t* create_uri(const char* buf) {
   uri->raw_path = extract_part(&matches[URI_PATH], buf);
   uri->input = extract_part(&matches[URI_INPUT], buf);
 
-  uri->path = strdup(uri->raw_path);
+  if (uri->raw_path != NULL) {
+    uri->path = strdup(uri->raw_path);
+  }
+
   standardize_path(&uri->path);
 
   // path can be null if EOM occurred trying to add default doc
