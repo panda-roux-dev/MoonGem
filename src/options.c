@@ -21,7 +21,7 @@ static const char* const usage[] = {
 };
 
 cli_options_t* parse_options(int argc, const char** argv) {
-  cli_options_t* options = malloc(sizeof(cli_options_t));
+  cli_options_t* options = calloc(1, sizeof(cli_options_t));
   if (options == NULL) {
     LOG_ERROR("Failed to allocate memory for the CLI options structure");
     return NULL;
