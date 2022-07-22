@@ -12,6 +12,8 @@ typedef struct cli_options_t {
   char* pre_script_path;
   char* post_script_path;
   char* error_script_path;
+  char* script_mode_path;
+  char* script_mode_input;
 } cli_options_t;
 
 cli_options_t* parse_options(int argc, const char** argv);

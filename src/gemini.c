@@ -410,10 +410,6 @@ static void listener_cb(struct evconnlistener* listener, evutil_socket_t fd,
   bufferevent_enable(bev, EV_READ);
 }
 
-static bool init_regex(void) {
-  return init_uri_regex() == 0 && init_parser_regex() == 0;
-}
-
 static struct magic_set* init_magic(void) {
   struct magic_set* magic = magic_open(MAGIC_MIME | MAGIC_CHECK);
   if (magic != NULL) {
@@ -424,11 +420,6 @@ static struct magic_set* init_magic(void) {
 
 gemini_listener_t* init_gemini_listener(cli_options_t* options,
                                         struct event_base* evtbase) {
-  if (!init_regex()) {
-    LOG_ERROR("Failed to compile gemini regex");
-    return NULL;
-  }
-
   gemini_listener_t* gemini = calloc(1, sizeof(gemini_listener_t));
 
   gemini->magic = init_magic();
@@ -462,9 +453,6 @@ cleanup:
 }
 
 void cleanup_gemini_listener(gemini_listener_t* gemini) {
-  cleanup_uri_regex();
-  cleanup_parser_regex();
-
   if (gemini == NULL) {
     return;
   }

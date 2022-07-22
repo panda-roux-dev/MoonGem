@@ -105,6 +105,11 @@ int init_uri_regex(void) {
 void cleanup_uri_regex(void) { regfree(&uri_regexp); }
 
 uri_t* create_uri(const char* buf) {
+  if (buf == NULL) {
+    LOG_DEBUG("Empty URI buffer");
+    return NULL;
+  }
+
   regmatch_t matches[URI_PART_COUNT] = {0};
   switch (regexec(&uri_regexp, buf, URI_PART_COUNT, &matches[0],
                   REG_NOTBOL | REG_NOTEOL)) {

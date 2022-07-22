@@ -2,6 +2,7 @@
 
 #include <argparse.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "log.h"
 
@@ -16,7 +17,7 @@
 
 static const char* const usage[] = {
     "moongem [options] --cert=cert.pem --key=key.pem",
-    "moongem [options] -c cert.pem -k key.pem",
+    "moongem --script=script.lua gemini://localhost/document.gmi",
     NULL,
 };
 
@@ -38,6 +39,7 @@ cli_options_t* parse_options(int argc, const char** argv) {
   const char* pre_script_path = NULL;
   const char* post_script_path = NULL;
   const char* error_script_path = NULL;
+  const char* script_mode_path = NULL;
 
   struct argparse_option options_config[] = {
       OPT_HELP(),
@@ -64,13 +66,37 @@ cli_options_t* parse_options(int argc, const char** argv) {
       OPT_STRING('e', "error", &error_script_path,
                  "script to be run after a request has resulted "
                  "in an error response code (40 thru 59)"),
+      OPT_GROUP("Script Mode"),
+      OPT_STRING('s', "script", &script_mode_path,
+                 "MoonGem will run the provided script and then exit.  Any "
+                 "rendered content will be written to stdout.  An additional "
+                 "argument may be provided in order to specify the URI to pass "
+                 "to the script environment's request data."),
       OPT_END(),
   };
 
   struct argparse parser;
   argparse_init(&parser, options_config, usage, 0);
   argparse_describe(&parser, "\n" DESCRIPTION, "\n" ADDITIONAL);
-  argparse_parse(&parser, argc, argv);
+  int remaining = argparse_parse(&parser, argc, argv);
+
+  if (script_mode_path != NULL) {
+    // run in script mode
+    options->script_mode_path = realpath(script_mode_path, NULL);
+    if (options->script_mode_path == NULL) {
+      LOG_ERROR("Invalid script path");
+      goto failure;
+    }
+
+    LOG_DEBUG("remaining: %d; argc: %d", remaining, argc);
+
+    if (remaining > 0) {
+      options->script_mode_input = strdup(argv[argc - 1]);
+    }
+
+    // no other arguments apply in script mode
+    return options;
+  }
 
   if (cert_path == NULL) {
     LOG_ERROR("Missing certificate path argument!");
@@ -150,6 +176,14 @@ void destroy_options(cli_options_t* options) {
 
   if (options->key_path != NULL) {
     free(options->key_path);
+  }
+
+  if (options->script_mode_path != NULL) {
+    free(options->script_mode_path);
+  }
+
+  if (options->script_mode_input != NULL) {
+    free(options->script_mode_input);
   }
 
   free(options);

@@ -1,14 +1,28 @@
 #include <errno.h>
+#include <event2/buffer.h>
 #include <event2/event.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "gemini.h"
 #include "log.h"
 #include "options.h"
+#include "parse.h"
+#include "script.h"
 #include "signals.h"
+#include "uri.h"
+
+int run_server_mode(cli_options_t* options);
+
+int run_script_mode(cli_options_t* options);
 
 int main(int argc, const char** argv) {
+  if (init_uri_regex() != 0 || init_parser_regex() != 0) {
+    LOG_ERROR("Failed to compile regexp");
+    return EXIT_FAILURE;
+  }
+
   cli_options_t* options = parse_options(argc, argv);
   if (options == NULL) {
     return EXIT_FAILURE;
@@ -21,6 +35,21 @@ int main(int argc, const char** argv) {
   }
 #endif
 
+  // run a one-off script if that's what was configured
+  if (options->script_mode_path != NULL) {
+  }
+
+  int status = options->script_mode_path == NULL ? run_server_mode(options)
+                                                 : run_script_mode(options);
+
+  destroy_options(options);
+  cleanup_uri_regex();
+  cleanup_parser_regex();
+
+  return status;
+}
+
+int run_server_mode(cli_options_t* options) {
   // move the working directory to the user-defined root path if provided
   if (options->root != NULL) {
     chdir(options->root);
@@ -53,7 +82,27 @@ int main(int argc, const char** argv) {
   cleanup_signal_handlers(evts);
   event_base_free(evtbase);
 
-  destroy_options(options);
-
   return EXIT_SUCCESS;
+}
+
+int run_script_mode(cli_options_t* options) {
+  gemini_context_t ctx = {0};
+
+  // parse the URI provided via the command-line if provided
+  ctx.request.uri = create_uri(options->script_mode_input);
+
+  // create a new script context and output buffer, then execute the script file
+  script_ctx_t* script_ctx = create_script_ctx(&ctx);
+  struct evbuffer* buffer = evbuffer_new();
+  script_result_t result =
+      exec_script_file(script_ctx, options->script_mode_path, buffer);
+
+  // write to STDOUT
+  evbuffer_write(buffer, STDOUT_FILENO);
+
+  evbuffer_free(buffer);
+  destroy_script(script_ctx);
+  destroy_uri(ctx.request.uri);
+
+  return result == SCRIPT_OK;
 }
