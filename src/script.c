@@ -1,5 +1,6 @@
 #include "script.h"
 
+#include <event2/buffer.h>
 #include <lauxlib.h>
 #include <libgen.h>
 #include <lua.h>
@@ -171,7 +172,7 @@ static void set_registry_data(script_ctx_t* ctx) {
   lua_setfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
 
   // add user input as a global variable, if present
-  if (request->uri->input != NULL) {
+  if (request->uri != NULL && request->uri->input != NULL) {
     lua_pushstring(L, request->uri->input);
     lua_setfield(L, LUA_REGISTRYINDEX, FLD_INPUT);
   }
