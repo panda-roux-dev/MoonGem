@@ -31,21 +31,21 @@ set(SRC_FILES
 set(CMAKE_C_FLAGS_DEBUG
   "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -ggdb")
 set(CMAKE_C_FLAGS_RELEASE
-  "${CMAKE_C_FLAGS_RELEASE} -flto -O3")
+  "${CMAKE_C_FLAGS_RELEASE} -flto -O2")
 
 # add external library directory
 add_subdirectory(${MOONGEM_LIB_DIR})
 
 # find libraries
 find_package(PkgConfig)
-find_package(OpenSSL 1.1.1 REQUIRED)
-find_package(Lua 5.4 REQUIRED)
 
 if (PKG_CONFIG_FOUND)
-  pkg_check_modules(EVT libevent_core)
-  pkg_check_modules(EVT_SSL libevent_openssl)
-  pkg_check_modules(PCRE libpcre2-posix)
-  pkg_check_modules(MAGIC libmagic)
+  pkg_check_modules(EVT REQUIRED IMPORTED_TARGET libevent_core)
+  pkg_check_modules(EVT_SSL REQUIRED IMPORTED_TARGET libevent_openssl)
+  pkg_check_modules(OPENSSL REQUIRED IMPORTED_TARGET openssl)
+  pkg_check_modules(PCRE REQUIRED IMPORTED_TARGET libpcre2-posix)
+  pkg_check_modules(MAGIC REQUIRED IMPORTED_TARGET libmagic)
+  pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.4)
 endif()
 
 # prepend the 'src' directory name to each of the source files
@@ -55,19 +55,19 @@ list(TRANSFORM SRC_FILES PREPEND "${MOONGEM_SRC_DIR}/")
 add_executable(${MOONGEM_EXE} ${SRC_FILES})
 target_link_libraries(${MOONGEM_EXE} PRIVATE
   ${ARGPARSE_LIBRARIES}
-  ${MAGIC_LIBRARIES}
-  ${LUA_LIBRARIES}
-  ${OPENSSL_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
-  ${EVT_LIBRARIES}
-  ${EVT_SSL_LIBRARIES}
-  ${PCRE_LIBRARIES})
+  PkgConfig::MAGIC
+  PkgConfig::LUA
+  PkgConfig::EVT
+  PkgConfig::EVT_SSL
+  PkgConfig::OPENSSL
+  PkgConfig::PCRE)
 target_include_directories(${MOONGEM_EXE} PRIVATE
   ${MOONGEM_INCLUDE_DIR}
   ${ARGPARSE_INCLUDE_DIR}
   ${MAGIC_INCLUDES}
-  ${LUA_INCLUDE_DIR}
-  ${OPENSSL_INCLUDE_DIR}
+  ${LUA_INCLUDE_DIRS}
+  ${OPENSSL_INCLUDE_DIRS}
   ${EVT_INCLUDE_DIRS}
   ${EVT_SSL_INCLUDE_DIRS}
   ${PCRE_INCLUDE_DIRS})
