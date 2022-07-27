@@ -1,3 +1,6 @@
 [submodule "lib/argparse"]
 	path = lib/argparse
 	url = https://github.com/cofyc/argparse.git
+[submodule "lib/wyhash"]
+	path = lib/wyhash
+	url = https://github.com/wangyi-fudan/wyhash
