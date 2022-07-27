@@ -25,7 +25,8 @@ set(SRC_FILES
   "cert.c"
   "uri.c"
   "util.c"
-  "signals.c")
+  "signals.c"
+  "store.c")
 
 # set default compile flags
 set(CMAKE_C_FLAGS_DEBUG
@@ -68,6 +69,7 @@ target_include_directories(${MOONGEM_EXE} PRIVATE
   ${MAGIC_INCLUDES}
   ${LUA_INCLUDE_DIRS}
   ${OPENSSL_INCLUDE_DIRS}
+  ${WYHASH_INCLUDE_DIR}
   ${EVT_INCLUDE_DIRS}
   ${EVT_SSL_INCLUDE_DIRS}
   ${PCRE_INCLUDE_DIRS})
