@@ -20,6 +20,7 @@
 #include "net.h"
 #include "parse.h"
 #include "status.h"
+#include "store.h"
 #include "uri.h"
 #include "util.h"
 
@@ -37,6 +38,7 @@ typedef struct gemini_listener_t {
   cli_options_t* options;
   net_t* net;
   struct magic_set* magic;
+  store_t* store;
 } gemini_listener_t;
 
 typedef struct context_t {
@@ -48,6 +50,7 @@ typedef struct context_t {
   cli_options_t* options;
   struct magic_set* magic;
   script_ctx_t* script_ctx;
+  store_t* store;
 } context_t;
 
 static client_cert_t* create_client_cert() {
@@ -105,14 +108,14 @@ static void end_response_cb(struct bufferevent* bev, void* data) {
   if (options->post_script_path != NULL &&
       !STATUS_IS_ERROR(ctx->gemini.response.status)) {
     if (ctx->script_ctx == NULL) {
-      ctx->script_ctx = create_script_ctx(&ctx->gemini);
+      ctx->script_ctx = create_script_ctx(&ctx->gemini, ctx->store);
     }
 
     exec_script_file(ctx->script_ctx, options->post_script_path, ctx->out);
   } else if (options->post_script_path != NULL &&
              STATUS_IS_ERROR(ctx->gemini.response.status)) {
     if (ctx->script_ctx == NULL) {
-      ctx->script_ctx = create_script_ctx(&ctx->gemini);
+      ctx->script_ctx = create_script_ctx(&ctx->gemini, ctx->store);
     }
 
     exec_script_file(ctx->script_ctx, options->error_script_path, ctx->out);
@@ -207,7 +210,7 @@ static void send_script_response(context_t* ctx, struct bufferevent* bev) {
 
   // parse the gemtext file and run any scripts found within
   parser_t* parser =
-      create_doc_parser(&ctx->gemini, &ctx->file, ctx->script_ctx);
+      create_doc_parser(&ctx->gemini, &ctx->file, ctx->script_ctx, ctx->store);
   struct evbuffer* rendered = evbuffer_new();
   parse_gemtext_doc(parser, rendered);
 
@@ -335,7 +338,7 @@ static void read_cb(struct bufferevent* bev, void* data) {
     // try to run a pre-request script if applicable
     bool pre_script_failed = false;
     if (options->pre_script_path != NULL) {
-      ctx->script_ctx = create_script_ctx(&ctx->gemini);
+      ctx->script_ctx = create_script_ctx(&ctx->gemini, ctx->store);
       ctx->early = evbuffer_new();
       if (exec_script_file(ctx->script_ctx, options->pre_script_path,
                            ctx->early) != SCRIPT_OK) {
@@ -405,6 +408,7 @@ static void listener_cb(struct evconnlistener* listener, evutil_socket_t fd,
   ctx->options = gemini->options;
   ctx->script_ctx = NULL;
   ctx->early = NULL;
+  ctx->store = gemini->store;
 
   bufferevent_setcb(bev, read_cb, NULL, event_cb, ctx);
   bufferevent_enable(bev, EV_READ);
@@ -435,6 +439,8 @@ gemini_listener_t* init_gemini_listener(cli_options_t* options,
     goto cleanup;
   }
 
+  gemini->store = create_store(INITIAL_STORE_SIZE);
+
   gemini->options = options;
 
   gemini->listener =
@@ -459,6 +465,10 @@ void cleanup_gemini_listener(gemini_listener_t* gemini) {
 
   if (gemini->listener != NULL) {
     evconnlistener_free(gemini->listener);
+  }
+
+  if (gemini->store != NULL) {
+    destroy_store(gemini->store);
   }
 
   if (gemini->net != NULL) {

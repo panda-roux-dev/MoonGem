@@ -11,6 +11,7 @@
 #include "parse.h"
 #include "script.h"
 #include "signals.h"
+#include "store.h"
 #include "uri.h"
 
 int run_server_mode(cli_options_t* options);
@@ -34,10 +35,6 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 #endif
-
-  // run a one-off script if that's what was configured
-  if (options->script_mode_path != NULL) {
-  }
 
   int status = options->script_mode_path == NULL ? run_server_mode(options)
                                                  : run_script_mode(options);
@@ -88,11 +85,13 @@ int run_server_mode(cli_options_t* options) {
 int run_script_mode(cli_options_t* options) {
   gemini_context_t ctx = {0};
 
+  store_t* store = create_store(INITIAL_STORE_SIZE);
+
   // parse the URI provided via the command-line if provided
   ctx.request.uri = create_uri(options->script_mode_input);
 
   // create a new script context and output buffer, then execute the script file
-  script_ctx_t* script_ctx = create_script_ctx(&ctx);
+  script_ctx_t* script_ctx = create_script_ctx(&ctx, store);
   struct evbuffer* buffer = evbuffer_new();
   script_result_t result =
       exec_script_file(script_ctx, options->script_mode_path, buffer);
@@ -103,6 +102,7 @@ int run_script_mode(cli_options_t* options) {
   evbuffer_free(buffer);
   destroy_script(script_ctx);
   destroy_uri(ctx.request.uri);
+  destroy_store(store);
 
   return result == SCRIPT_OK;
 }

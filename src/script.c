@@ -11,6 +11,7 @@
 #include "gemini.h"
 #include "log.h"
 #include "status.h"
+#include "store.h"
 #include "uri.h"
 
 #define LIBRARY_TABLE_NAME "mg"
@@ -56,6 +57,8 @@
 #define FUNC_BEGIN_BLOCK "begin_block"
 #define FUNC_END_BLOCK "end_block"
 
+#define TBL_STORE "store"
+
 #define SCRIPT_BUFFER_SIZE (1 << 16)
 
 static char global_script_buffer[SCRIPT_BUFFER_SIZE];
@@ -64,6 +67,7 @@ typedef struct script_ctx_t {
   lua_State* L;
   const request_t* request;
   response_t* response;
+  store_t* store;
 } script_ctx_t;
 
 /* Pre-Request */
@@ -112,6 +116,10 @@ int api_block(lua_State* L);
 int api_beginblock(lua_State* L);
 int api_endblock(lua_State* L);
 
+/* Key/Value Store */
+int api_set_store_value(lua_State* L);
+int api_get_store_value(lua_State* L);
+
 static void set_api_methods(lua_State* L) {
   luaL_Reg methods[] = {{FUNC_SET_PATH, api_set_path},
                         {FUNC_INTERRUPT, api_interrupt},
@@ -157,6 +165,16 @@ static void set_api_methods(lua_State* L) {
                         {NULL, NULL}};
 
   luaL_newlib(L, methods);
+
+  // set up a table for the key/value store
+  lua_newtable(L);
+  luaL_Reg store_metamethods[] = {{"__index", api_get_store_value},
+                                  {"__newindex", api_set_store_value},
+                                  {NULL, NULL}};
+  luaL_newlib(L, store_metamethods);
+  lua_setmetatable(L, -2);
+  lua_setfield(L, -2, TBL_STORE);
+
   lua_setglobal(L, LIBRARY_TABLE_NAME);
 }
 
@@ -170,6 +188,9 @@ static void set_registry_data(script_ctx_t* ctx) {
 
   lua_pushlightuserdata(L, (request_t*)request);
   lua_setfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
+
+  lua_pushlightuserdata(L, ctx->store);
+  lua_setfield(L, LUA_REGISTRYINDEX, FLD_STORE);
 
   // add user input as a global variable, if present
   if (request->uri != NULL && request->uri->input != NULL) {
@@ -208,7 +229,7 @@ static void append_dir_to_package_path(lua_State* L, const char* path) {
   lua_setfield(L, -2, "path");
 }
 
-script_ctx_t* create_script_ctx(gemini_context_t* gemini) {
+script_ctx_t* create_script_ctx(gemini_context_t* gemini, store_t* store) {
   script_ctx_t* ctx = calloc(1, sizeof(script_ctx_t));
   if (ctx == NULL) {
     LOG_ERROR("Failed to allocate space for the script context");
@@ -221,6 +242,7 @@ script_ctx_t* create_script_ctx(gemini_context_t* gemini) {
   ctx->L = L;
   ctx->request = &gemini->request;
   ctx->response = &gemini->response;
+  ctx->store = store;
 
   set_registry_data(ctx);
   set_api_methods(L);

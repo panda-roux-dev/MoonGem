@@ -79,4 +79,14 @@ if(DISABLE_LOGGING)
   target_compile_definitions(${MOONGEM_EXE} PRIVATE MOONGEM_DISABLE_LOGGING)
 endif()
 
+add_executable(store_test src/test/store.c src/store.c)
+target_compile_options(store_test PRIVATE -O0 -ggdb -DDEBUG)
+target_include_directories(store_test PRIVATE 
+  ${MOONGEM_INCLUDE_DIR}
+  ${WYHASH_INCLUDE_DIR})
+
+add_custom_target(test
+  COMMAND store_test
+  USES_TERMINAL)
+
 install(TARGETS ${MOONGEM_EXE} DESTINATION bin)

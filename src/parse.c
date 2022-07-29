@@ -58,12 +58,13 @@ int init_parser_regex(void) {
 void cleanup_parser_regex(void) { regfree(&parser_regexp); }
 
 parser_t* create_doc_parser(gemini_context_t* gemini, file_info_t* file,
-                            script_ctx_t* script_ctx) {
+                            script_ctx_t* script_ctx, store_t* store) {
   parser_t* parser = (parser_t*)malloc(sizeof(parser_t));
   parser->gemini = gemini;
   parser->file = file;
   parser->script_ctx =
       script_ctx;  // may be NULL if no pre-request script was run
+  parser->store = store;
 
   return parser;
 }
@@ -88,7 +89,7 @@ void parse_gemtext_doc(parser_t* parser, struct evbuffer* buffer) {
 
     if (parser->script_ctx == NULL) {
       // create the scripting environment if it doesn't exist
-      parser->script_ctx = create_script_ctx(parser->gemini);
+      parser->script_ctx = create_script_ctx(parser->gemini, parser->store);
     }
 
     if (exec_script(parser->script_ctx, &cursor[script->rm_so],

@@ -11,12 +11,14 @@
 #define FLD_REQUEST "__REQUEST"
 #define FLD_BUFFER "__BUFFER"
 #define FLD_INPUT "__INPUT"
+#define FLD_STORE "__STORE"
 
 typedef struct script_ctx_t script_ctx_t;
+typedef struct store_t store_t;
 
 typedef enum script_result_t { SCRIPT_OK, SCRIPT_ERROR } script_result_t;
 
-script_ctx_t* create_script_ctx(gemini_context_t* gemini);
+script_ctx_t* create_script_ctx(gemini_context_t* gemini, store_t* store);
 
 void destroy_script(script_ctx_t* ctx);
 

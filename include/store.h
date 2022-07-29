@@ -5,9 +5,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define INITIAL_STORE_SIZE 32
+
 typedef struct cell_t {
   uint64_t key;
   char* data;
+  bool deleted;
 } cell_t;
 
 typedef struct store_t {

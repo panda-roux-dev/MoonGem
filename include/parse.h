@@ -10,11 +10,13 @@ typedef struct evbuffer evbuffer;  // defined in libevent2
 
 typedef struct script_ctx_t script_ctx_t;
 typedef struct file_info_t file_info_t;
+typedef struct store_t store_t;
 
 typedef struct parser_t {
   file_info_t* file;
   script_ctx_t* script_ctx;
   gemini_context_t* gemini;
+  store_t* store;
 } parser_t;
 
 int init_parser_regex(void);
@@ -22,7 +24,7 @@ int init_parser_regex(void);
 void cleanup_parser_regex(void);
 
 parser_t* create_doc_parser(gemini_context_t* gemini, file_info_t* file,
-                            script_ctx_t* script_ctx);
+                            script_ctx_t* script_ctx, store_t* store);
 
 void parse_gemtext_doc(parser_t* parser, struct evbuffer* buffer);
 

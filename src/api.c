@@ -9,6 +9,7 @@
 #include "log.h"
 #include "script.h"
 #include "status.h"
+#include "store.h"
 #include "uri.h"
 
 #define LINK_TOKEN "=>"
@@ -540,4 +541,36 @@ int api_endblock(lua_State* L) {
   evbuffer_add(buffer, BLOCK_TOKEN NEWLINE, sizeof(BLOCK_TOKEN NEWLINE) - 1);
 
   return 0;
+}
+
+int api_set_store_value(lua_State* L) {
+  char* key = (char*)lua_tostring(L, 2);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_STORE);
+  store_t* store = lua_touserdata(L, -1);
+
+  if (!lua_isnoneornil(L, 3)) {
+    char* value = (char*)lua_tostring(L, 3);
+    insert_into_store(store, key, value);
+  } else {
+    delete_from_store(store, key);
+  }
+
+  return 0;
+}
+
+int api_get_store_value(lua_State* L) {
+  char* key = (char*)lua_tostring(L, 2);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_STORE);
+  store_t* store = lua_touserdata(L, -1);
+
+  const char* result = get_from_store(store, key);
+  if (result == NULL) {
+    lua_pushnil(L);
+  } else {
+    lua_pushstring(L, result);
+  }
+
+  return 1;
 }
