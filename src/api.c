@@ -60,9 +60,6 @@ int api_interrupt(lua_State* L) {
 int api_set_input(lua_State* L) {
   lua_settop(L, 1);
 
-  lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
-  request_t* request = (request_t*)lua_touserdata(L, -1);
-
   if (!lua_isnoneornil(L, 1)) {
     lua_pushstring(L, luaL_checkstring(L, 1));
   } else {
