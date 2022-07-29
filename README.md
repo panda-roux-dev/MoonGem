@@ -186,3 +186,6 @@ These methods are concerned with handling user-input.
     - Returns `true` if a client certificate was included along with the request
     - Otherwise returns `false`
 
+### Key/Value Store
+
+MoonGem implements an in-memory key/value store accessed via the `mg.store` table.  This feature is useful for establishing state that's persistent across multiple requests.
