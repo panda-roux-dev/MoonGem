@@ -122,7 +122,7 @@ uri_t* create_uri(const char* buf) {
 
   LOG_DEBUG("Request: %s", buf);
 
-  uri_t* uri = malloc(sizeof(uri_t));
+  uri_t* uri = calloc(1, sizeof(uri_t));
   uri->scheme = extract_part(&matches[URI_SCHEME], buf);
   uri->host = extract_part(&matches[URI_HOST], buf);
   uri->port = extract_part(&matches[URI_PORT], buf);
