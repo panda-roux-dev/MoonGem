@@ -66,6 +66,7 @@ static void insert_by_keyhash(store_t* store, uint64_t key, char* data) {
 
   cell->key = key;
   cell->data = data;
+  cell->length = strlen(data);
   cell->deleted = false;
 }
 
@@ -133,11 +134,13 @@ bool delete_from_store(store_t* store, char* key) {
     return false;
   }
 
-  target->deleted = true;
   if (target->data != NULL) {
     free(target->data);
     target->data = NULL;
   }
+
+  target->deleted = true;
+  target->length = 0;
 
   --(store->stored_count);
 

@@ -1,5 +1,6 @@
 #include <lauxlib.h>
 #include <lua.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -22,6 +23,10 @@
 
 #define FLD_CERT_FINGERPRINT "fingerprint"
 #define FLD_CERT_EXPIRATION "not_after"
+
+#define FLD_STORE_LENGTH "length"
+#define FLD_STORE_CAPACITY "capacity"
+#define FLD_STORE_DATA_SIZE "data_size"
 
 static void set_interrupt_response(response_t* response, int status,
                                    const char* meta) {
@@ -568,6 +573,70 @@ int api_get_store_value(lua_State* L) {
   } else {
     lua_pushstring(L, result);
   }
+
+  return 1;
+}
+
+int api_dump_store(lua_State* L) {
+  lua_settop(L, 1);
+
+  const char* path = lua_tostring(L, 1);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_STORE);
+  store_t* store = lua_touserdata(L, -1);
+
+  FILE* out = path == NULL ? stdout : fopen(path, "w");
+  if (out == NULL) {
+    luaL_error(L, "Failed to open output stream");
+  } else {
+    fprintf(out, "position\tkey\tlength\tdata\n");
+    for (size_t i = 0; i < store->cell_count; i++) {
+      cell_t* cell = &store->cells[i];
+      if (cell->key == 0 || cell->deleted) {
+        continue;
+      }
+
+      fprintf(out, "%zu\t%zu\t%zu\t%s\n", i, cell->key, cell->length,
+              cell->data);
+    }
+  }
+
+  return 0;
+}
+
+int api_get_store_length(lua_State* L) {
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_STORE);
+  store_t* store = lua_touserdata(L, -1);
+
+  lua_pushinteger(L, store->stored_count);
+
+  return 1;
+}
+
+int api_get_store_info(lua_State* L) {
+  lua_newtable(L);
+
+  lua_getfield(L, LUA_REGISTRYINDEX, FLD_STORE);
+  store_t* store = lua_touserdata(L, -1);
+
+  lua_pushinteger(L, store->stored_count);
+  lua_setfield(L, -2, FLD_STORE_LENGTH);
+
+  lua_pushinteger(L, store->cell_count);
+  lua_setfield(L, -2, FLD_STORE_CAPACITY);
+
+  size_t total_length = 0;
+  for (size_t i = 0; i < store->cell_count; i++) {
+    cell_t* cell = &store->cells[i];
+    if (cell->key == 0 || cell->deleted) {
+      continue;
+    }
+
+    total_length += cell->length;
+  }
+
+  lua_pushinteger(L, total_length);
+  lua_setfield(L, -2, FLD_STORE_DATA_SIZE);
 
   return 1;
 }

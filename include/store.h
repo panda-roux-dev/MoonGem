@@ -9,6 +9,7 @@
 
 typedef struct cell_t {
   uint64_t key;
+  size_t length;
   char* data;
   bool deleted;
 } cell_t;

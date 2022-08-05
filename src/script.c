@@ -59,6 +59,9 @@
 
 #define TBL_STORE "store"
 
+#define FUNC_DUMP "dump"
+#define FUNC_INFO "get_info"
+
 #define SCRIPT_BUFFER_SIZE (1 << 16)
 
 static char global_script_buffer[SCRIPT_BUFFER_SIZE];
@@ -119,6 +122,9 @@ int api_endblock(lua_State* L);
 /* Key/Value Store */
 int api_set_store_value(lua_State* L);
 int api_get_store_value(lua_State* L);
+int api_dump_store(lua_State* L);
+int api_get_store_length(lua_State* L);
+int api_get_store_info(lua_State* L);
 
 static void set_api_methods(lua_State* L) {
   luaL_Reg methods[] = {{FUNC_SET_PATH, api_set_path},
@@ -167,9 +173,13 @@ static void set_api_methods(lua_State* L) {
   luaL_newlib(L, methods);
 
   // set up a table for the key/value store
-  lua_newtable(L);
+  luaL_Reg store_methods[] = {{FUNC_DUMP, api_dump_store},
+                              {FUNC_INFO, api_get_store_info},
+                              {NULL, NULL}};
+  luaL_newlib(L, store_methods);
   luaL_Reg store_metamethods[] = {{"__index", api_get_store_value},
                                   {"__newindex", api_set_store_value},
+                                  {"__len", api_get_store_length},
                                   {NULL, NULL}};
   luaL_newlib(L, store_metamethods);
   lua_setmetatable(L, -2);
