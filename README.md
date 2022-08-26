@@ -96,6 +96,19 @@ These methods are only accessible from pre-request scripts.
     - Instructs MoonGem to bypass the rest of the requet-handling pipeline and use the current response state
     - Unless otherwise set, the default response status code will be 20 (OK)
 
+### Key/Value Store
+
+MoonGem implements an in-memory key/value store accessed via the `mg.store` table.  This feature is useful for establishing state that's persistent across multiple requests.
+
+- `#mg.store`
+    - Returns the number of stored key/value pairs
+- `mg.store.dump([path])`
+    - Writes the contents of the data store in a tab-separated format to a file at `path`, or stdout if `path` is ommitted
+- `mg.store.get_info()`
+    - Returns a table with the following fields:
+        - `length`: The number of stored key/value pairs
+        - `capacity`: The total number of slots allocated
+        - `data_size`: The combined length of all of the stored values, in bytes
 ### Body
 
 These methods modify the body of the Gemini page.
@@ -186,16 +199,3 @@ These methods are concerned with handling user-input.
     - Returns `true` if a client certificate was included along with the request
     - Otherwise returns `false`
 
-### Key/Value Store
-
-MoonGem implements an in-memory key/value store accessed via the `mg.store` table.  This feature is useful for establishing state that's persistent across multiple requests.
-
-- `#mg.store`
-  - Returns the number of stored key/value pairs
-- `mg.store.dump([path])`
-  - Writes the contents of the data store in a tab-separated format to a file at `path`, or stdout if `path` is ommitted
-- `mg.store.get_info()`
-  - Returns a table with the following fields:
-    - `length`: The number of stored key/value pairs
-    - `capacity`: The total number of slots allocated
-    - `data_size`: The combined length of all of the stored values, in bytes
