@@ -30,7 +30,7 @@ VOLUME /gemini
 VOLUME /gemini/public
 
 # create the service user account
-RUN adduser -D -H mg && mkdir /gemini && chown -R mg:mg /gemini
+RUN adduser -D -H mg && mkdir -p /gemini && chown -R mg:mg /gemini
 
 # copy the compiled binary to the /app/ directory
 WORKDIR /app/
