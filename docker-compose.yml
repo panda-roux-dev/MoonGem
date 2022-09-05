@@ -1,0 +1,9 @@
+services:
+  moongem:
+    build: .
+    ports:
+      - 1965:1965
+    volumes:
+      # consider modifying these!
+      - .:/gemini
+      - .:/gemini/public

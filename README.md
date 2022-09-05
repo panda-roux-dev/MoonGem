@@ -75,6 +75,26 @@ Middleware
     -e, --error=<str>     script to be run after a request has resulted in an error response code (40 thru 59)
 ```
 
+## Docker Compose Example Usage
+
+```
+# clone the repository
+git clone https://git.panda-roux.dev/MoonGem && cd MoonGem
+
+# generate a self-signed certificate
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 3650 -nodes -subj "/CN=localhost"
+
+# create a document
+echo "Hi you!" > index.gmi
+
+# allow the container to read files
+chmod 644 *.pem
+chmod 644 index.gmi
+
+# start the container
+docker-compose up
+```
+
 ## API
 
 The start and end of script sections are indicated with a double curly-braces.
