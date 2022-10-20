@@ -25,7 +25,7 @@
 #include "util.h"
 
 #define CRLF "\r\n"
-#define TAG_DELIMITER ";"
+#define TAG_DELIMITER "; "
 #define MAX_URL_LENGTH 1024
 #define MIMETYPE_GEMTEXT "text/gemini; encoding=utf-8"
 #define DEFAULT_MIMETYPE "application/octet-stream"
@@ -134,12 +134,12 @@ static void write_header(context_t* ctx) {
   response_t* res = &gemini->response;
   struct evbuffer* out = ctx->out;
 
-  evbuffer_add_printf(out, "%d", res->status);
+  evbuffer_add_printf(out, "%d ", res->status);
 
   // write meta
   bool has_tags = false;
   if (response_has_meta(res)) {
-    evbuffer_add_printf(out, " %s", &res->meta[0]);
+    evbuffer_add_printf(out, "%s", &res->meta[0]);
     has_tags = true;
   }
 
@@ -149,7 +149,7 @@ static void write_header(context_t* ctx) {
       evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
     }
 
-    evbuffer_add_printf(out, " %s", &res->mimetype[0]);
+    evbuffer_add_printf(out, "%s", &res->mimetype[0]);
     has_tags = true;
   }
 
@@ -159,7 +159,7 @@ static void write_header(context_t* ctx) {
       evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
     }
 
-    evbuffer_add_printf(out, " lang=%s", &res->language[0]);
+    evbuffer_add_printf(out, "lang=%s", &res->language[0]);
   }
 
   // terminate header
