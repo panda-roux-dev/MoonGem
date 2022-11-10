@@ -67,7 +67,7 @@ static void cleanup_ssl(SSL_CTX* ctx) {
     SSL_CTX_free(ctx);
   }
 
-  FIPS_mode_set(0);
+  // FIPS_mode_set(0);
   CRYPTO_cleanup_all_ex_data();
   ERR_free_strings();
   EVP_cleanup();
