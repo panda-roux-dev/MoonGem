@@ -129,43 +129,6 @@ static void end_response_cb(struct bufferevent* bev, void* data) {
   bufferevent_trigger_event(bev, BEV_EVENT_EOF | BEV_EVENT_WRITING, 0);
 }
 
-static void write_header(context_t* ctx) {
-  gemini_context_t* gemini = &ctx->gemini;
-  response_t* res = &gemini->response;
-  struct evbuffer* out = ctx->out;
-
-  evbuffer_add_printf(out, "%d ", res->status);
-
-  // write meta
-  bool has_tags = false;
-  if (response_has_meta(res)) {
-    evbuffer_add_printf(out, "%s", &res->meta[0]);
-    has_tags = true;
-  }
-
-  // write mimetype
-  if (response_has_mime(res)) {
-    if (has_tags) {
-      evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
-    }
-
-    evbuffer_add_printf(out, "%s", &res->mimetype[0]);
-    has_tags = true;
-  }
-
-  // write language
-  if (response_has_lang(res)) {
-    if (has_tags) {
-      evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
-    }
-
-    evbuffer_add_printf(out, "lang=%s", &res->language[0]);
-  }
-
-  // terminate header
-  evbuffer_add(out, CRLF, sizeof(CRLF) - 1);
-}
-
 static void serve_static_file_cb(struct bufferevent* bev, void* data) {
   context_t* ctx = (context_t*)data;
   file_info_t* file = &ctx->file;
@@ -196,7 +159,7 @@ static void serve_static_file_cb(struct bufferevent* bev, void* data) {
 
 static void send_status_response(context_t* ctx, struct bufferevent* bev) {
   // write the response header
-  write_header(ctx);
+  write_header(&ctx->gemini.response, ctx->out);
 
   // write the response to the socket and terminate
   bufferevent_write_buffer(bev, ctx->out);
@@ -231,7 +194,7 @@ static void send_script_response(context_t* ctx, struct bufferevent* bev) {
   set_response_mime(res, MIMETYPE_GEMTEXT);
 
   // write the response header to a buffer, followed by the rendered gemtext
-  write_header(ctx);
+  write_header(res, ctx->out);
 
   // if the pre-request script wrote anything, then include that
   if (ctx->early != NULL) {
@@ -263,7 +226,7 @@ static void send_file_response(context_t* ctx, struct bufferevent* bev) {
   set_response_mime(res, mimetype);
 
   // write response header
-  write_header(ctx);
+  write_header(res, ctx->out);
 
   // if the pre-request script wrote anything, then include that
   if (ctx->early != NULL) {
@@ -284,7 +247,7 @@ static void send_early_response(context_t* ctx, struct bufferevent* bev) {
   LOG_DEBUG("Pre-request script bypassed the rest of the response pipeline");
 
   // write response header
-  write_header(ctx);
+  write_header(&ctx->gemini.response, ctx->out);
 
   // all we should have is the pre-response script's output buffer, so just
   // write that and end the response
@@ -485,4 +448,37 @@ void cleanup_gemini_listener(gemini_listener_t* gemini) {
 void set_response_status(response_t* response, int code, const char* meta) {
   response->status = code;
   set_response_meta(response, meta);
+}
+
+void write_header(response_t* res, struct evbuffer* out) {
+  evbuffer_add_printf(out, "%d ", res->status);
+
+  // write meta
+  bool has_tags = false;
+  if (response_has_meta(res)) {
+    evbuffer_add_printf(out, "%s", &res->meta[0]);
+    has_tags = true;
+  }
+
+  // write mimetype
+  if (response_has_mime(res)) {
+    if (has_tags) {
+      evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
+    }
+
+    evbuffer_add_printf(out, "%s", &res->mimetype[0]);
+    has_tags = true;
+  }
+
+  // write language
+  if (response_has_lang(res)) {
+    if (has_tags) {
+      evbuffer_add(out, TAG_DELIMITER, sizeof(TAG_DELIMITER) - 1);
+    }
+
+    evbuffer_add_printf(out, "lang=%s", &res->language[0]);
+  }
+
+  // terminate header
+  evbuffer_add(out, CRLF, sizeof(CRLF) - 1);
 }

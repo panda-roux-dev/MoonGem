@@ -11,6 +11,7 @@
 #include "parse.h"
 #include "script.h"
 #include "signals.h"
+#include "status.h"
 #include "store.h"
 #include "uri.h"
 
@@ -92,14 +93,25 @@ int run_script_mode(cli_options_t* options) {
 
   // create a new script context and output buffer, then execute the script file
   script_ctx_t* script_ctx = create_script_ctx(&ctx, store);
-  struct evbuffer* buffer = evbuffer_new();
+  struct evbuffer* script_buffer = evbuffer_new();
   script_result_t result =
-      exec_script_file(script_ctx, options->script_mode_path, buffer);
+      exec_script_file(script_ctx, options->script_mode_path, script_buffer);
+
+  if (result == SCRIPT_OK && ctx.response.status == 0) {
+    ctx.response.status = STATUS_DEFAULT;
+  } else if (result == SCRIPT_ERROR) {
+    ctx.response.status = STATUS_CGI_ERROR;
+  }
+
+  struct evbuffer* out = evbuffer_new();
+  write_header(&ctx.response, out);
+  evbuffer_add_buffer(out, script_buffer);
 
   // write to STDOUT
-  evbuffer_write(buffer, STDOUT_FILENO);
+  evbuffer_write(out, STDOUT_FILENO);
 
-  evbuffer_free(buffer);
+  evbuffer_free(script_buffer);
+  evbuffer_free(out);
   destroy_script(script_ctx);
   destroy_uri(ctx.request.uri);
   destroy_store(store);

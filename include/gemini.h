@@ -31,6 +31,7 @@
 
 struct event_base;      // defined in libevent2
 struct evconnlistener;  // defined in libevent2
+struct evbuffer;        // defined in libevent2
 
 typedef struct client_cert_t client_cert_t;
 typedef struct uri_t uri_t;
@@ -62,5 +63,7 @@ gemini_listener_t* init_gemini_listener(cli_options_t* options,
 void cleanup_gemini_listener(gemini_listener_t* gemini);
 
 void set_response_status(response_t* response, int code, const char* meta);
+
+void write_header(response_t* res, struct evbuffer* out);
 
 #endif
