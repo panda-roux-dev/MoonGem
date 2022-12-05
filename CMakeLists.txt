@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(moongem VERSION 2.0.0 LANGUAGES C)
+project(moongem VERSION 2.3.3 LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # set some variables
-set(MOONGEM_EXE moongem)
+set(MOONGEM_EXE ${CMAKE_PROJECT_NAME})
 set(MOONGEM_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(MOONGEM_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 set(MOONGEM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -72,6 +72,9 @@ target_include_directories(${MOONGEM_EXE} PRIVATE
 if(DISABLE_LOGGING)
   target_compile_definitions(${MOONGEM_EXE} PRIVATE MOONGEM_DISABLE_LOGGING)
 endif()
+
+target_compile_definitions(${MOONGEM_EXE} PRIVATE
+  MOONGEM_VERSION="${CMAKE_PROJECT_VERSION}")
 
 add_executable(store_test src/test/store.c src/store.c)
 target_compile_options(store_test PRIVATE -O0 -ggdb -DDEBUG)

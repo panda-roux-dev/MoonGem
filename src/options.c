@@ -77,7 +77,8 @@ cli_options_t* parse_options(int argc, const char** argv) {
 
   struct argparse parser;
   argparse_init(&parser, options_config, usage, 0);
-  argparse_describe(&parser, "\n" DESCRIPTION, "\n" ADDITIONAL);
+  argparse_describe(&parser, DESCRIPTION,
+                    "\n(" MOONGEM_VERSION ") " ADDITIONAL);
   int remaining = argparse_parse(&parser, argc, argv);
 
   if (script_mode_path != NULL) {
