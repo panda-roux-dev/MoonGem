@@ -28,12 +28,6 @@ set(SRC_FILES
   "signals.c"
   "store.c")
 
-# set default compile flags
-set(CMAKE_C_FLAGS_DEBUG
-  "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -ggdb")
-set(CMAKE_C_FLAGS_RELEASE
-  "${CMAKE_C_FLAGS_RELEASE} -flto -O2")
-
 # add external library directory
 add_subdirectory(${MOONGEM_LIB_DIR})
 
@@ -46,7 +40,7 @@ if (PKG_CONFIG_FOUND)
   pkg_check_modules(OPENSSL REQUIRED IMPORTED_TARGET openssl)
   pkg_check_modules(PCRE REQUIRED IMPORTED_TARGET libpcre2-posix)
   pkg_check_modules(MAGIC REQUIRED IMPORTED_TARGET libmagic)
-  pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.4)
+  pkg_search_module(LUA REQUIRED IMPORTED_TARGET lua5.4 lua5.3)
 endif()
 
 # prepend the 'src' directory name to each of the source files
