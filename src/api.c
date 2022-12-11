@@ -151,7 +151,7 @@ int api_get_path(lua_State* L) {
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
   request_t* request = (request_t*)lua_touserdata(L, -1);
 
-  if (request->uri->path != NULL) {
+  if (request->uri != NULL && request->uri->path != NULL) {
     lua_pushstring(L, request->uri->path);
   } else {
     lua_pushnil(L);
@@ -164,7 +164,7 @@ int api_get_raw_path(lua_State* L) {
   lua_getfield(L, LUA_REGISTRYINDEX, FLD_REQUEST);
   request_t* request = (request_t*)lua_touserdata(L, -1);
 
-  if (request->uri->raw_path != NULL) {
+  if (request->uri != NULL && request->uri->raw_path != NULL) {
     lua_pushstring(L, request->uri->raw_path);
   } else {
     lua_pushnil(L);
