@@ -14,6 +14,7 @@
 #define ADDITIONAL                                                   \
   "Developed by panda-roux.  Source and documentation can be found " \
   "at https://git.panda-roux.dev/MoonGem"
+#define VERSIONS "Version: " MOONGEM_VERSION "\nLua: " LUA_VERSION
 
 static const char* const usage[] = {
     "moongem [options] --cert=cert.pem --key=key.pem",
@@ -77,8 +78,7 @@ cli_options_t* parse_options(int argc, const char** argv) {
 
   struct argparse parser;
   argparse_init(&parser, options_config, usage, 0);
-  argparse_describe(&parser, DESCRIPTION,
-                    "\n(" MOONGEM_VERSION ") " ADDITIONAL);
+  argparse_describe(&parser, VERSIONS "\n" DESCRIPTION, "\n" ADDITIONAL);
   int remaining = argparse_parse(&parser, argc, argv);
 
   if (script_mode_path != NULL) {

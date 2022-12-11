@@ -74,7 +74,8 @@ if(DISABLE_LOGGING)
 endif()
 
 target_compile_definitions(${MOONGEM_EXE} PRIVATE
-  MOONGEM_VERSION="${CMAKE_PROJECT_VERSION}")
+  MOONGEM_VERSION="${CMAKE_PROJECT_VERSION}"
+  LUA_VERSION="${LUA_VERSION}")
 
 add_executable(store_test src/test/store.c src/store.c)
 target_compile_options(store_test PRIVATE -O0 -ggdb -DDEBUG)
