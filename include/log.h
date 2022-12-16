@@ -10,15 +10,7 @@
 
 #define LOG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #define LOG_NOLF(fmt, ...) printf(fmt, ##__VA_ARGS__)
-#define LOG_ERROR(fmt, ...)                       \
-  {                                               \
-    if (errno > 0) {                              \
-      fprintf(stderr, fmt, ##__VA_ARGS__);        \
-      fprintf(stderr, ": %s\n", strerror(errno)); \
-    } else {                                      \
-      fprintf(stderr, fmt "\n", ##__VA_ARGS__);   \
-    }                                             \
-  }
+#define LOG_ERROR(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__);
 
 #ifdef DEBUG
 #define LOG_DEBUG(fmt, ...) \
